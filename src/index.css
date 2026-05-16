@@ -1425,7 +1425,8 @@ button {
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 
-.msg-bubble:hover .msg-actions {
+.msg-bubble:hover .msg-actions,
+.msg-bubble.show-mobile-actions .msg-actions {
   opacity: 1;
   top: -18px;
 }
