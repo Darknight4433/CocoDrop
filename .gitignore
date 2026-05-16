@@ -27,3 +27,10 @@ server/.env
 *.njsproj
 *.sln
 *.sw?
+
+# Project specific
+server/data/
+server/uploads/
+server/tmp-pwcheck.js
+android/
+capacitor.config.json

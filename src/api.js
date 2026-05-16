@@ -1,7 +1,11 @@
 import axios from "axios";
 
-const SERVER_IP = window.location.hostname;
-export const SERVER_URL = `http://${SERVER_IP}:4000`;
+// Auto-detects the server URL:
+//   • In production (served by Express): same origin → relative URL ""
+//   • In Vite dev mode: Vite proxies /api → Express on 4000
+//   • Override with VITE_SERVER_URL in .env.local if needed
+const isDev = import.meta.env.DEV;
+export const SERVER_URL = import.meta.env.VITE_SERVER_URL || (isDev ? "http://localhost:4000" : "");
 
 const API = axios.create({ baseURL: `${SERVER_URL}/api` });
 

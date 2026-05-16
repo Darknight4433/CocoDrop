@@ -29,7 +29,13 @@ export default function LoginPage({ onLogin }) {
       <div className="login-grid" aria-hidden="true" />
       <div className="login-shell">
         <section className="login-panel brand-panel">
-          <h1 className="login-title">CocoDrop</h1>
+          {/* Full logo */}
+          <div className="brand-panel-hero">
+            <div className="brand-hero-logo-wrap">
+              <img src="/logo.png" alt="CocoDrop Logo" className="brand-hero-logo" />
+            </div>
+          </div>
+          {/* Bottom content */}
           <p className="login-sub">
             A clean chat workspace for public rooms, invite-only rooms, and personal direct messages.
           </p>

@@ -6,36 +6,58 @@ const cors = require("cors");
 const path = require("path");
 const fs = require("fs");
 
-const authRoutes = require("./routes/auth");
+const authRoutes    = require("./routes/auth");
 const channelRoutes = require("./routes/channels");
 const messageRoutes = require("./routes/messages");
 const { handleSocket } = require("./socket");
 
-const app = express();
+const app    = express();
 const server = http.createServer(app);
 
+// Ensure storage dirs exist (important for Termux first run)
 ["uploads", "data"].forEach((dir) => {
   const fullPath = path.join(__dirname, dir);
   if (!fs.existsSync(fullPath)) fs.mkdirSync(fullPath, { recursive: true });
 });
 
+// ── Socket.io ────────────────────────────────────────────────
 const io = new Server(server, {
   cors: { origin: "*", methods: ["GET", "POST"] },
 });
 
+// ── Middleware ───────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-app.use("/api/auth", authRoutes);
-app.use("/api", channelRoutes);
+// ── API Routes ───────────────────────────────────────────────
+app.use("/api/auth",     authRoutes);
+app.use("/api",          channelRoutes);
 app.use("/api/messages", messageRoutes);
 
-app.get("/", (req, res) => res.json({ status: "CocoDrop server running" }));
+// ── Serve built frontend (production / Termux) ───────────────
+// The React build is placed one level up in /dist after running `npm run build`
+const distPath = path.join(__dirname, "..", "dist");
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  // For React Router — any unknown route serves index.html (Express 5 syntax)
+  app.get("/{*path}", (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+  });
+} else {
+  // Dev mode fallback (Vite dev server handles the frontend)
+  app.get("/", (req, res) =>
+    res.json({ status: "🥥 CocoDrop API running", mode: "development" })
+  );
+}
 
 handleSocket(io);
 
+// ── Start ────────────────────────────────────────────────────
 const PORT = process.env.PORT || 4000;
-server.listen(PORT, () => {
-  console.log(`CocoDrop server running at http://localhost:${PORT}`);
+server.listen(PORT, "0.0.0.0", () => {
+  // 0.0.0.0 = accessible from other devices on same WiFi (important for Termux)
+  console.log(`\n🥥 CocoDrop server → http://localhost:${PORT}`);
+  console.log(`📱 From phone/Termux → http://YOUR_IP:${PORT}`);
+  console.log(`📁 Data saved to: ${path.join(__dirname, "data")}\n`);
 });

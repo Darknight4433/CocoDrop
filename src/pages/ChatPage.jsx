@@ -84,6 +84,9 @@ export default function ChatPage({ user, onLogout }) {
   const [mutedRooms, setMutedRooms] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem("cd_muted") || "[]")); } catch { return new Set(); }
   });
+  // Unread messages: { [channelId]: number }
+  const [unreadCounts, setUnreadCounts] = useState({});
+  const [windowFocused, setWindowFocused] = useState(true);
 
   const socketRef = useRef(null);
   const activeChannelRef = useRef(null);
@@ -131,15 +134,52 @@ export default function ChatPage({ user, onLogout }) {
   }, [myStatus]);
 
   useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+    const handleFocus = () => setWindowFocused(true);
+    const handleBlur = () => setWindowFocused(false);
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, []);
+
+  useEffect(() => {
     const token = localStorage.getItem("sc_token");
     const socket = io(SERVER_URL, { auth: { token } });
     socketRef.current = socket;
 
     socket.on("online_users", setOnlineUsers);
     socket.on("receive_message", (msg) => {
-      if (msg.channelId === activeChannelRef.current?.id) {
+      const isActive = msg.channelId === activeChannelRef.current?.id;
+      if (isActive) {
         setMessages((prev) => [...prev, msg]);
         scrollToBottom();
+      }
+
+      // Handle unread counts and notifications
+      if (msg.senderName !== user.username) {
+        if (!isActive || !document.hasFocus()) {
+          setUnreadCounts((prev) => ({
+            ...prev,
+            [msg.channelId]: (prev[msg.channelId] || 0) + 1,
+          }));
+
+          // Browser Notification
+          if (Notification.permission === "granted" && myStatus !== "dnd") {
+            const n = new Notification(`New message from ${msg.senderName}`, {
+              body: msg.content,
+              icon: "/logo.png",
+            });
+            n.onclick = () => {
+              window.focus();
+              // Logic to open this channel could go here
+            };
+          }
+        }
       }
     });
     socket.on("user_typing", ({ username, channelId }) => {
@@ -179,6 +219,13 @@ export default function ChatPage({ user, onLogout }) {
     setChannelError("");
     setUploadError("");
     setIsMember(null); // reset — loading state
+
+    // Clear unread count
+    setUnreadCounts((prev) => {
+      const next = { ...prev };
+      delete next[channel.id];
+      return next;
+    });
 
     socketRef.current?.emit("join_channel", channel.id);
 
@@ -497,7 +544,7 @@ export default function ChatPage({ user, onLogout }) {
       <Message 
         key={m._id} 
         msg={m} 
-        isMe={m.senderName === user.username} 
+        isMe={m.senderName?.trim() === user.username?.trim()} 
         serverUrl={SERVER_URL} 
         onImageClick={setViewingImage}
         onEdit={startEdit}
@@ -511,7 +558,7 @@ export default function ChatPage({ user, onLogout }) {
       <aside className="sidebar">
         <div className="sidebar-top">
           <div className="brand">
-            <div className="brand-mark">{favoriteEmoji}</div>
+            <img src="/logo.png" alt="CocoDrop Logo" className="sidebar-logo" />
             <div>
               <span className="brand-name">CocoDrop</span>
               <span className="brand-caption">{onlineCount} online now</span>
@@ -572,6 +619,9 @@ export default function ChatPage({ user, onLogout }) {
                 {room.isPrivate ? "Invite" : (room.isMember ? "Joined" : "Open")}
               </span>
               {room.createdBy === user.username && <span className="ch-badge host-badge">Host</span>}
+              {unreadCounts[room._id] > 0 && (
+                <span className="unread-badge">{unreadCounts[room._id]}</span>
+              )}
             </button>
           ))}
 
@@ -613,6 +663,9 @@ export default function ChatPage({ user, onLogout }) {
                   </span>
                 )}
                 {isOnline(other) && <span className="dm-online-dot" />}
+                {unreadCounts[dm._id] > 0 && (
+                  <span className="unread-badge" style={{ marginLeft: "auto" }}>{unreadCounts[dm._id]}</span>
+                )}
               </button>
             );
           })}
