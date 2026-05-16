@@ -299,14 +299,14 @@ button {
 
 /* Full logo — no cropping */
 .brand-hero-logo-wrap {
-  width: 220px;
+  width: 300px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .brand-hero-logo {
-  width: 220px;
+  width: 300px;
   height: auto;
   object-fit: contain;
   opacity: 0.95;
