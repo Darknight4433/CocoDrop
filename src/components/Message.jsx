@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AvatarCircle } from "../utils/avatar";
 
-const SERVER_URL = "http://localhost:4000";
+import { SERVER_URL } from "../api";
 
 export default function Message({ msg, isMe, serverUrl, onImageClick, onEdit, onDelete }) {
   const [showMobileActions, setShowMobileActions] = useState(false);

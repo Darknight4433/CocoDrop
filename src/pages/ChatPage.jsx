@@ -4,7 +4,7 @@ import API from "../api";
 import Message from "../components/Message";
 import { AvatarCircle } from "../utils/avatar";
 
-const SERVER_URL = "http://localhost:4000";
+import { SERVER_URL } from "../api";
 const THEMES = [
   { id: "aurora", name: "Aurora" },
   { id: "graphite", name: "Graphite" },
