@@ -31,6 +31,7 @@ app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ── API Routes ───────────────────────────────────────────────
+app.get("/ping", (req, res) => res.json({ status: "ok" }));
 app.use("/api/auth",     authRoutes);
 app.use("/api",          channelRoutes);
 app.use("/api/messages", messageRoutes);
@@ -52,6 +53,17 @@ if (fs.existsSync(distPath)) {
 }
 
 handleSocket(io);
+
+// ── Keep-alive ping (prevents Render free tier spin-down) ────
+// Pings itself every 14 minutes so the server never goes idle
+const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 4000}`;
+setInterval(() => {
+  http.get(`${SELF_URL}/ping`, (res) => {
+    console.log(`🏓 keep-alive ping → ${res.statusCode}`);
+  }).on("error", (err) => {
+    console.warn("keep-alive ping failed:", err.message);
+  });
+}, 14 * 60 * 1000); // every 14 minutes
 
 // ── Start ────────────────────────────────────────────────────
 const PORT = process.env.PORT || 4000;
