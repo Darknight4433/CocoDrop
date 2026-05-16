@@ -129,12 +129,14 @@ button {
 }
 
 .login-page {
-  min-height: 100vh;
+  min-height: 100%;
+  height: 100vh;
   display: grid;
   place-items: center;
   padding: 28px;
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .login-grid {
@@ -235,7 +237,6 @@ button {
 }
 
 .feature-strip span,
-.privacy-pill,
 .ch-badge {
   border: 1px solid var(--border);
   background: color-mix(in srgb, var(--panel-2) 82%, transparent);
@@ -244,6 +245,19 @@ button {
   padding: 6px 10px;
   font-size: 0.72rem;
   font-weight: 700;
+}
+
+.privacy-pill {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel-2) 82%, transparent);
+  color: var(--muted);
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .auth-panel {
@@ -374,6 +388,8 @@ button {
 
 .app-layout {
   height: 100vh;
+  max-height: 100vh;
+  width: 100vw;
   display: grid;
   grid-template-columns: 316px minmax(0, 1fr);
   overflow: hidden;
@@ -383,19 +399,24 @@ button {
 }
 
 .sidebar {
+  height: 100%;
+  max-height: 100vh;
   border-right: 1px solid var(--border);
   background: color-mix(in srgb, var(--panel-solid) 88%, transparent);
   backdrop-filter: blur(18px);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   min-width: 0;
 }
 
 .sidebar-top {
-  padding: 18px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border);
-  display: grid;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .brand {
@@ -420,12 +441,13 @@ button {
 
 .me-pill {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: flex-start;
+  gap: 8px;
   border: 1px solid var(--border);
   background: var(--panel-2);
   border-radius: 8px;
-  padding: 10px;
+  padding: 8px;
+  min-width: 0;
 }
 
 .me-copy {
@@ -452,6 +474,7 @@ button {
   font-weight: 800;
   padding: 8px;
   border-radius: 6px;
+  flex-shrink: 0;
 }
 
 .settings-btn:hover,
@@ -502,7 +525,9 @@ button {
 
 .sidebar-scroll {
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 0 12px 18px;
+  flex: 1;
   min-height: 0;
 }
 
@@ -623,9 +648,12 @@ button {
 }
 
 .chat-main {
+  height: 100%;
+  max-height: 100vh;
   min-width: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   background:
     linear-gradient(180deg, color-mix(in srgb, var(--bg-soft) 92%, transparent), var(--bg)),
     var(--bg-soft);
@@ -664,12 +692,18 @@ button {
 .modal-footer {
   display: flex;
   align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .welcome-actions {
   margin-top: 22px;
+  flex-wrap: wrap;
+}
+
+.modal-footer {
+  margin-top: 18px;
+  flex-wrap: wrap;
 }
 
 .welcome-pill,
@@ -683,7 +717,13 @@ button {
   border-radius: 8px;
 }
 
-.welcome-pill.outline,
+.header-action-btn {
+  min-height: 32px !important;
+  padding: 0 12px !important;
+  font-size: 0.78rem !important;
+  font-weight: 700 !important;
+}
+
 .btn-secondary,
 .header-action-btn,
 .attach-btn {
@@ -702,15 +742,18 @@ button {
 }
 
 .chat-header {
-  min-height: 72px;
-  padding: 14px 22px;
+  min-height: 60px;
+  max-height: 64px;
+  padding: 0 18px;
   border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--panel) 92%, transparent);
   backdrop-filter: blur(16px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
+  gap: 12px;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 .chat-header-left {
@@ -746,8 +789,9 @@ button {
 
 .messages-area {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 22px;
+  padding: 18px 22px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -905,6 +949,13 @@ button {
   padding: 14px 18px 18px;
   border-top: 1px solid var(--border);
   background: color-mix(in srgb, var(--panel) 94%, transparent);
+}
+
+.composer-error {
+  grid-column: 1 / -1;
+  color: var(--danger);
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .msg-input {
@@ -1197,6 +1248,7 @@ button {
 @media (max-width: 680px) {
   .login-page {
     padding: 14px;
+    place-items: start center;
   }
 
   .brand-panel,
@@ -1206,6 +1258,7 @@ button {
 
   .app-layout {
     grid-template-columns: 1fr;
+    grid-template-rows: 42vh minmax(0, 58vh);
   }
 
   .sidebar {
@@ -1234,4 +1287,536 @@ button {
   .room-type-toggle {
     grid-template-columns: 1fr;
   }
+
+  .theme-settings-grid,
+  .segmented-row {
+    grid-template-columns: 1fr;
+  }
+
+  .emoji-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* ── Password show/hide toggle ── */
+.password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-wrapper .login-input {
+  padding-right: 44px;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--faint);
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  border-radius: 6px;
+  transition: color 0.18s;
+}
+
+.password-toggle:hover {
+  color: var(--accent);
+}
+
+/* ── Host badge ── */
+.host-badge {
+  color: var(--accent-2) !important;
+  border-color: color-mix(in srgb, var(--accent-2) 36%, transparent) !important;
+  font-size: 0.6rem;
+}
+
+/* ── Danger / Delete button ── */
+.danger-btn {
+  color: var(--danger) !important;
+  border-color: color-mix(in srgb, var(--danger) 32%, transparent) !important;
+  background: color-mix(in srgb, var(--danger) 8%, transparent) !important;
+}
+.danger-btn:hover {
+  background: color-mix(in srgb, var(--danger) 18%, transparent) !important;
+}
+
+/* ── DM Nickname edit ── */
+.nick-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.nick-input {
+  border: 1px solid var(--border-strong);
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  outline: none;
+  width: 180px;
+}
+.nick-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.nick-save-btn {
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.nick-save-btn:hover { background: var(--accent); color: #03130f; }
+
+.nick-cancel-btn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+.nick-cancel-btn:hover { color: var(--danger); border-color: var(--danger); }
+
+.nick-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: var(--faint);
+  cursor: pointer;
+  font-size: 0.85rem;
+  margin-left: 6px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  vertical-align: middle;
+  transition: color 0.15s;
+}
+.nick-edit-btn:hover { color: var(--accent); }
+
+.msg-bubble { position: relative; }
+
+.msg-actions {
+  position: absolute;
+  top: -12px;
+  right: 10px;
+  display: flex;
+  gap: 4px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px;
+  opacity: 0;
+  transition: all 0.2s ease;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+
+.msg-bubble:hover .msg-actions {
+  opacity: 1;
+  top: -18px;
+}
+
+.msg-action-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.msg-action-btn:hover { background: var(--border); color: var(--text); }
+.msg-action-btn.danger:hover { background: var(--danger); color: white; }
+
+.msg-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.msg-edited {
+  font-size: 0.65rem;
+  color: var(--faint);
+  font-style: italic;
+}
+
+/* Lightbox / Image Viewer */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  backdrop-filter: blur(10px);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  cursor: zoom-out;
+}
+
+.lightbox-content {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 0 40px rgba(0,0,0,0.5);
+  cursor: default;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255,255,255,0.1);
+  border: none;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lightbox-close:hover { background: rgba(255,255,255,0.2); }
+
+/* ── Daylight (light mode) fixes ── */
+body[data-theme="daylight"] .sidebar {
+  background: rgba(255,255,255,0.92);
+  border-right-color: rgba(15,23,42,0.12);
+}
+body[data-theme="daylight"] .login-panel {
+  background: rgba(255,255,255,0.96);
+}
+body[data-theme="daylight"] .mode-btn.active {
+  color: #ffffff;
+}
+body[data-theme="daylight"] .login-btn,
+body[data-theme="daylight"] .send-btn,
+body[data-theme="daylight"] .welcome-pill,
+body[data-theme="daylight"] .btn-primary {
+  color: #ffffff;
+}
+body[data-theme="daylight"] .ch-item:hover {
+  background: rgba(15,23,42,0.06);
+}
+body[data-theme="daylight"] .ch-item.ch-active {
+  background: linear-gradient(90deg, var(--accent-soft), transparent);
+}
+body[data-theme="daylight"] .msg-bubble.me {
+  color: #ffffff;
+}
+body[data-theme="daylight"] .modal-box {
+  background: #ffffff;
+  border-color: rgba(15,23,42,0.15);
+}
+body[data-theme="daylight"] .modal-input,
+body[data-theme="daylight"] .login-input {
+  background: #f0f6ff;
+  color: #172033;
+}
+body[data-theme="daylight"] .password-toggle {
+  color: #7b8797;
+}
+body[data-theme="daylight"] .me-pill {
+  background: #f0f6ff;
+  border-color: rgba(15,23,42,0.1);
+}
+body[data-theme="daylight"] .input-bar {
+  background: rgba(255,255,255,0.95);
+  border-top-color: rgba(15,23,42,0.1);
+}
+body[data-theme="daylight"] .msg-input {
+  background: #edf3f8;
+  color: #172033;
+}
+body[data-theme="daylight"] .chat-header {
+  background: rgba(255,255,255,0.9);
+}
+
+.edit-box {
+  grid-column: 1 / -1;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.edit-info {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+
+.edit-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.edit-input {
+  flex: 1;
+  background: var(--panel-solid);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+}
+
+.edit-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.edit-btn.save { background: var(--accent); color: white; }
+.edit-btn.save:hover { filter: brightness(1.1); }
+.edit-btn.cancel { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.edit-btn.cancel:hover { background: var(--border); }
+
+/* ══════════════════════════════════════════
+   THEME-SPECIFIC OVERRIDES
+   Ensures every theme looks correct
+   ══════════════════════════════════════════ */
+
+/* ── Graphite fixes — ensure text is readable on near-black bg ── */
+body[data-theme="graphite"] .login-btn,
+body[data-theme="graphite"] .send-btn,
+body[data-theme="graphite"] .welcome-pill,
+body[data-theme="graphite"] .btn-primary {
+  color: #000000;
+}
+body[data-theme="graphite"] .mode-btn.active {
+  color: #000000;
+}
+
+/* ── Ember — ensure login text readable ── */
+body[data-theme="ember"] .login-btn,
+body[data-theme="ember"] .send-btn,
+body[data-theme="ember"] .btn-primary {
+  color: #1a0800;
+}
+
+/* ── Me avatar wrap with status dot ── */
+.me-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.me-status-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--panel-solid);
+  display: block;
+}
+
+/* ── Status pills ── */
+.status-pills {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.status-pill {
+  font-size: 0.58rem;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  border-radius: 20px;
+  padding: 1px 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.status-pill:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.status-pill.active {
+  font-weight: 900;
+}
+
+/* ── Search users btn in brand ── */
+.search-users-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.search-users-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ── Discover rooms section ── */
+.discover-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--faint);
+  padding: 10px 12px 4px;
+  margin: 0;
+}
+
+.discover-item {
+  opacity: 0.72;
+  border-left: 2px dashed var(--border) !important;
+}
+.discover-item:hover {
+  opacity: 1;
+}
+
+/* ── Members panel rows ── */
+.member-row {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  cursor: default !important;
+}
+.member-row:hover {
+  background: var(--panel-2) !important;
+}
+
+.member-name {
+  flex: 1;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.member-status-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+/* ── Context Menu ── */
+.ctx-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+}
+
+.ctx-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 180px;
+  background: var(--panel-solid);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+  padding: 6px;
+  backdrop-filter: blur(20px);
+}
+
+.ctx-header {
+  padding: 8px 12px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+  font-weight: 800;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+
+.ctx-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ctx-item:hover {
+  background: var(--panel-2);
+  color: var(--accent);
+}
+
+.ctx-item.danger:hover {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.mute-icon {
+  font-size: 0.8rem;
+  margin-left: 6px;
+  opacity: 0.6;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.ch-muted {
+  opacity: 0.65;
+}
+
+.ch-muted:hover {
+  opacity: 1;
 }
