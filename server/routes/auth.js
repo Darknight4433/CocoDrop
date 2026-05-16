@@ -6,6 +6,18 @@ const { users } = require("../db");
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || "cocodrop_secret";
 
+// Auth middleware
+function authMiddleware(req, res, next) {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "No token" });
+  try {
+    req.user = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    res.status(401).json({ error: "Invalid token" });
+  }
+}
+
 // Register
 router.post("/register", async (req, res) => {
   try {
@@ -53,6 +65,21 @@ router.post("/login", (req, res) => {
     const token = jwt.sign({ id: user._id, username: trimmedUsername }, JWT_SECRET, { expiresIn: "7d" });
     res.json({ token, user: { id: user._id, username: trimmedUsername } });
   });
+});
+
+// Save FCM push token for this user (called on app load)
+router.post("/fcm-token", authMiddleware, (req, res) => {
+  const { fcmToken } = req.body;
+  if (!fcmToken) return res.status(400).json({ error: "fcmToken required" });
+  users.update(
+    { _id: req.user.id },
+    { $set: { fcmToken } },
+    {},
+    (err) => {
+      if (err) return res.status(500).json({ error: "Server error" });
+      res.json({ ok: true });
+    }
+  );
 });
 
 module.exports = router;
