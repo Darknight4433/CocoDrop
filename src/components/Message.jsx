@@ -33,7 +33,6 @@ export default function Message({ msg, isMe, serverUrl, onImageClick, onEdit, on
             </button>
           </div>
         )}
-//...
 
         {msg.type === "image" ? (
           <img
