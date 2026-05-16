@@ -88,7 +88,7 @@ export default function ChatPage({ user, onLogout }) {
   const [unreadCounts, setUnreadCounts] = useState({});
   const [windowFocused, setWindowFocused] = useState(true);
 
-  const socketRef = useRef(null);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const activeChannelRef = useRef(null);
   const prevChannelRef = useRef(null);
   const bottomRef = useRef(null);
@@ -207,6 +207,7 @@ export default function ChatPage({ user, onLogout }) {
   useEffect(() => { refreshRooms(); refreshDms(); }, []);
 
   const openChannel = async (channel) => {
+    setMobileSidebarOpen(false); // close sidebar on mobile when channel selected
     if (prevChannelRef.current) {
       socketRef.current?.emit("leave_channel", prevChannelRef.current.id);
     }
@@ -555,7 +556,11 @@ export default function ChatPage({ user, onLogout }) {
 
   return (
     <div className="app-layout">
-      <aside className="sidebar">
+      {/* Mobile sidebar overlay backdrop */}
+      {mobileSidebarOpen && (
+        <div className="mobile-sidebar-backdrop" onClick={() => setMobileSidebarOpen(false)} />
+      )}
+      <aside className={`sidebar ${mobileSidebarOpen ? "sidebar-open" : ""}`}>
         <div className="sidebar-top">
           <div className="brand">
             <img src="/logo.png" alt="CocoDrop Logo" className="sidebar-logo" />
@@ -675,6 +680,10 @@ export default function ChatPage({ user, onLogout }) {
       <main className="chat-main">
         {!activeChannel ? (
           <div className="welcome-screen">
+            {/* Mobile menu button shown when no channel is active */}
+            <button className="mobile-menu-fab" onClick={() => setMobileSidebarOpen(true)}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
             <div className="welcome-card">
               <p className="eyebrow">CocoDrop command center</p>
               <h2>Pick a room or start a private DM.</h2>
@@ -689,6 +698,10 @@ export default function ChatPage({ user, onLogout }) {
           <>
             <div className="chat-header">
               <div className="chat-header-left">
+                {/* Mobile back button */}
+                <button className="mobile-back-btn" onClick={() => setMobileSidebarOpen(true)}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                </button>
                 <span className="chat-header-icon">
                   {activeChannel.type === "dm"
                     ? <AvatarCircle username={activeChannel.name} size="sm" />
