@@ -1,0 +1,5 @@
+{"username":"smoke_1778918517","password":"$2b$10$G1ziCzS5nwVkw2dI6GIlbOsABypUdPC0IVxb26XXE/hbitv2nn8H2","createdAt":{"$$date":1778918518139},"_id":"0rfrCqltFEayoSJF"}
+{"username":"testuser","password":"$2b$10$xJCdJJmeSj4ZN045N1M3geFWkM7luV3mC89AM6soQq5kAG6Zr09gi","createdAt":{"$$date":1778916900170},"_id":"T6U08JZ27nGr4InO"}
+{"username":"ui_1778919226","password":"$2b$10$rvT49Lyab/JSQfg9.pdikeIL..3P.zKaPZN3puxQckxmId2YbmV3q","createdAt":{"$$date":1778919226435},"_id":"pWtS2KRXwAxBxOCo"}
+{"username":"frienduser","password":"$2b$10$Anxpk13eJyXKm67LOC/22OOnv5oCw9MjT43iW19x1Q/JdgayksKNG","createdAt":{"$$date":1778916992882},"_id":"rFhZBrt0fbRJp7Dz"}
+{"username":"testuserfrienduser","password":"$2b$10$7zw8WqDQywVUpQHjvE4TTOU.GfR8z9MdXF/gtSZy/P47vVFWRP7di","createdAt":{"$$date":1778916955101},"_id":"tPJvYrlRBYD6D5hO"}
