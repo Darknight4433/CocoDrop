@@ -2,7 +2,9 @@ const Datastore = require("@seald-io/nedb");
 const path = require("path");
 const fs = require("fs");
 
-const dataDir = path.join(__dirname, "data");
+// On Render, set DATA_DIR env var to a persistent disk mount path like /data
+// On local/Termux, defaults to ./data next to this file
+const dataDir = process.env.DATA_DIR || path.join(__dirname, "data");
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 
 const users    = new Datastore({ filename: path.join(dataDir, "users.db"),    autoload: true });

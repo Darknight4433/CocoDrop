@@ -89,6 +89,7 @@ export default function ChatPage({ user, onLogout }) {
   const [windowFocused, setWindowFocused] = useState(true);
 
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [creatingRoom, setCreatingRoom] = useState(false); // debounce room creation
   const activeChannelRef = useRef(null);
   const prevChannelRef = useRef(null);
   const bottomRef = useRef(null);
@@ -240,7 +241,8 @@ export default function ChatPage({ user, onLogout }) {
       scrollToBottom();
     } catch (err) {
       if (err.response?.status === 403) {
-        setIsMember(false);
+        // If forceMember is set (public room we just joined), don't lock out
+        setIsMember(channel.forceMember ? true : false);
       } else {
         setIsMember(true); // network error — don't lock the user out
       }
@@ -255,12 +257,11 @@ export default function ChatPage({ user, onLogout }) {
     } catch {
       // already a member or error — still open
     }
-    openChannel({ id: room._id, name: room.name, type: "room", isPrivate: room.isPrivate, createdBy: room.createdBy });
+    // Pass isMember:true directly so we don't hit the 403 check
+    openChannel({ id: room._id, name: room.name, type: "room", isPrivate: room.isPrivate, createdBy: room.createdBy, forceMember: true });
   };
 
   const openRoom = (room) => {
-    // Private rooms: open directly (server gates access by membership)
-    // Public rooms: ensure they're joined so they can send messages
     if (room.isPrivate) {
       openChannel({ id: room._id, name: room.name, type: "room", isPrivate: true, createdBy: room.createdBy });
     } else {
@@ -344,11 +345,18 @@ export default function ChatPage({ user, onLogout }) {
 
   const createRoom = async (e) => {
     e.preventDefault();
-    if (!newRoomName.trim()) return;
-    const res = await API.post("/rooms", { name: newRoomName.trim(), isPrivate: isPrivateRoom });
-    await refreshRooms();
-    setNewRoomName(""); setIsPrivateRoom(false); setShowNewRoom(false);
-    openChannel({ id: res.data._id, name: res.data.name, type: "room", isPrivate: res.data.isPrivate, createdBy: res.data.createdBy });
+    if (!newRoomName.trim() || creatingRoom) return;
+    setCreatingRoom(true);
+    try {
+      const res = await API.post("/rooms", { name: newRoomName.trim(), isPrivate: isPrivateRoom });
+      await refreshRooms();
+      setNewRoomName(""); setIsPrivateRoom(false); setShowNewRoom(false);
+      openChannel({ id: res.data._id, name: res.data.name, type: "room", isPrivate: res.data.isPrivate, createdBy: res.data.createdBy });
+    } catch (err) {
+      setChannelError(err.response?.data?.error || "Failed to create room");
+    } finally {
+      setCreatingRoom(false);
+    }
   };
 
 
@@ -860,7 +868,9 @@ export default function ChatPage({ user, onLogout }) {
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn-secondary" onClick={() => setShowNewRoom(false)}>Cancel</button>
-                <button type="submit" className="btn-primary" disabled={!newRoomName.trim()}>Create Room</button>
+                <button type="submit" className="btn-primary" disabled={!newRoomName.trim() || creatingRoom}>
+                  {creatingRoom ? "Creating…" : "Create Room"}
+                </button>
               </div>
             </form>
           </div>
