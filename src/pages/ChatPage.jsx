@@ -35,7 +35,6 @@ export default function ChatPage({ user, onLogout }) {
   const [text, setText] = useState("");
   const [typingUser, setTypingUser] = useState("");
   const [uploading, setUploading] = useState(false);
-  // isMember: null = loading, true = can access, false = no access
   const [isMember, setIsMember] = useState(null);
   const [uploadError, setUploadError] = useState("");
   const [channelError, setChannelError] = useState("");
@@ -43,7 +42,6 @@ export default function ChatPage({ user, onLogout }) {
   const [fontStyle, setFontStyle] = useState(() => localStorage.getItem("cd_font") || "inter");
   const [favoriteLetter, setFavoriteLetter] = useState(() => getSavedLetter(user.username));
   const [favoriteEmoji, setFavoriteEmoji] = useState(getSavedEmoji);
-
   const [showNewRoom, setShowNewRoom] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [newRoomName, setNewRoomName] = useState("");
@@ -55,41 +53,39 @@ export default function ChatPage({ user, onLogout }) {
   const [showNewDM, setShowNewDM] = useState(false);
   const [dmSearch, setDmSearch] = useState("");
   const [dmResults, setDmResults] = useState([]);
-  // DM Nicknames: { [dmId]: string } stored in localStorage
   const [dmNicknames, setDmNicknames] = useState(() => {
     try { return JSON.parse(localStorage.getItem("cd_nicknames") || "{}"); } catch { return {}; }
   });
   const [editingNick, setEditingNick] = useState(false);
   const [nickDraft, setNickDraft] = useState("");
-  // Rename room
   const [showRename, setShowRename] = useState(false);
   const [renameDraft, setRenameDraft] = useState("");
   const [editingMsg, setEditingMsg] = useState(null);
   const [editDraft, setEditDraft] = useState("");
   const [viewingImage, setViewingImage] = useState(null);
-  // Members panel
   const [showMembers, setShowMembers] = useState(false);
   const [roomMembers, setRoomMembers] = useState([]);
-  // User search modal
   const [showUserSearch, setShowUserSearch] = useState(false);
   const [userSearchQ, setUserSearchQ] = useState("");
   const [userSearchResults, setUserSearchResults] = useState([]);
-  // My status
   const [myStatus, setMyStatus] = useState(() => localStorage.getItem("cd_status") || "online");
-  // Right-click context menu
-  const [ctxMenu, setCtxMenu] = useState(null); // { x, y, room }
-  // Custom confirm dialog (replaces window.confirm)
-  const [confirmModal, setConfirmModal] = useState(null); // { title, body, onConfirm }
-  // Muted rooms: set of room IDs stored in localStorage
+  const [ctxMenu, setCtxMenu] = useState(null);
+  const [confirmModal, setConfirmModal] = useState(null);
   const [mutedRooms, setMutedRooms] = useState(() => {
     try { return new Set(JSON.parse(localStorage.getItem("cd_muted") || "[]")); } catch { return new Set(); }
   });
-  // Unread messages: { [channelId]: number }
   const [unreadCounts, setUnreadCounts] = useState({});
   const [windowFocused, setWindowFocused] = useState(true);
-
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [creatingRoom, setCreatingRoom] = useState(false); // debounce room creation
+  const [creatingRoom, setCreatingRoom] = useState(false);
+
+  // Mobile-specific state
+  const [activeTab, setActiveTab] = useState("home"); // "home" | "rooms" | "search"
+  const [showNavPopup, setShowNavPopup] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState({ users: [], rooms: [] });
+
+  const socketRef = useRef(null);
   const activeChannelRef = useRef(null);
   const prevChannelRef = useRef(null);
   const bottomRef = useRef(null);
@@ -97,7 +93,6 @@ export default function ChatPage({ user, onLogout }) {
   const typingTimeout = useRef(null);
   const fileInputRef = useRef(null);
 
-  // Helper: scroll the messages container to bottom without scrollIntoView
   const scrollToBottom = (instant = false) => {
     setTimeout(() => {
       if (messagesAreaRef.current) {
@@ -119,10 +114,8 @@ export default function ChatPage({ user, onLogout }) {
   const currentTheme = useMemo(() => THEMES.find((t) => t.id === theme) || THEMES[0], [theme]);
   const currentFont = useMemo(() => FONT_STYLES.find((f) => f.id === fontStyle) || FONT_STYLES[0], [fontStyle]);
 
-  // Derived DM state — computed from activeChannel only (no stale isMember dependency)
   const isPendingDM = activeChannel?.type === "dm" && activeChannel.status === "pending";
   const isPendingDMRequester = isPendingDM && activeChannel.requestedBy === user.username;
-  // Can send: must be a member/participant AND (if DM) must be active
   const canSendInActiveChannel = isMember === true && !isPendingDM;
 
   useEffect(() => { document.body.dataset.theme = theme; localStorage.setItem("cd_theme", theme); }, [theme]);
@@ -160,25 +153,18 @@ export default function ChatPage({ user, onLogout }) {
         setMessages((prev) => [...prev, msg]);
         scrollToBottom();
       }
-
-      // Handle unread counts and notifications
       if (msg.senderName !== user.username) {
         if (!isActive || !document.hasFocus()) {
           setUnreadCounts((prev) => ({
             ...prev,
             [msg.channelId]: (prev[msg.channelId] || 0) + 1,
           }));
-
-          // Browser Notification
           if (Notification.permission === "granted" && myStatus !== "dnd") {
             const n = new Notification(`New message from ${msg.senderName}`, {
               body: msg.content,
               icon: "/logo.png",
             });
-            n.onclick = () => {
-              window.focus();
-              // Logic to open this channel could go here
-            };
+            n.onclick = () => { window.focus(); };
           }
         }
       }
@@ -208,11 +194,10 @@ export default function ChatPage({ user, onLogout }) {
   useEffect(() => { refreshRooms(); refreshDms(); }, []);
 
   const openChannel = async (channel) => {
-    setMobileSidebarOpen(false); // close sidebar on mobile when channel selected
+    setMobileSidebarOpen(false);
     if (prevChannelRef.current) {
       socketRef.current?.emit("leave_channel", prevChannelRef.current.id);
     }
-
     setActiveChannel(channel);
     activeChannelRef.current = channel;
     prevChannelRef.current = channel;
@@ -220,20 +205,15 @@ export default function ChatPage({ user, onLogout }) {
     setTypingUser("");
     setChannelError("");
     setUploadError("");
-    setIsMember(null); // reset — loading state
-
-    // Clear unread count
+    setIsMember(null);
     setUnreadCounts((prev) => {
       const next = { ...prev };
       delete next[channel.id];
       return next;
     });
-
     socketRef.current?.emit("join_channel", channel.id);
-
     try {
       const res = await API.get(`/messages/${channel.id}`);
-      // Server returns { pending: true, messages: [] } for pending DMs, or array for normal channels
       const data = res.data;
       const msgs = Array.isArray(data) ? data : (data.messages || []);
       setMessages(msgs);
@@ -241,23 +221,18 @@ export default function ChatPage({ user, onLogout }) {
       scrollToBottom();
     } catch (err) {
       if (err.response?.status === 403) {
-        // If forceMember is set (public room we just joined), don't lock out
         setIsMember(channel.forceMember ? true : false);
       } else {
-        setIsMember(true); // network error — don't lock the user out
+        setIsMember(true);
       }
     }
   };
 
-  // Join a public room (adds user to members), then open it
   const joinPublicRoom = async (room) => {
     try {
       await API.post(`/rooms/${room._id}/join`);
       await refreshRooms();
-    } catch {
-      // already a member or error — still open
-    }
-    // Pass isMember:true directly so we don't hit the 403 check
+    } catch { }
     openChannel({ id: room._id, name: room.name, type: "room", isPrivate: room.isPrivate, createdBy: room.createdBy, forceMember: true });
   };
 
@@ -267,6 +242,11 @@ export default function ChatPage({ user, onLogout }) {
     } else {
       joinPublicRoom(room);
     }
+  };
+
+  const openDM = (dm) => {
+    const other = dm.participants.find((p) => p !== user.username);
+    openChannel({ id: dm._id, name: other, type: "dm", status: dm.status, requestedBy: dm.requestedBy });
   };
 
   const handleTyping = (e) => {
@@ -311,10 +291,7 @@ export default function ChatPage({ user, onLogout }) {
     }
   };
 
-  const startEdit = (msg) => {
-    setEditingMsg(msg);
-    setEditDraft(msg.content);
-  };
+  const startEdit = (msg) => { setEditingMsg(msg); setEditDraft(msg.content); };
 
   const saveEdit = async () => {
     if (!editDraft.trim() || !editingMsg) return;
@@ -359,7 +336,6 @@ export default function ChatPage({ user, onLogout }) {
     }
   };
 
-
   const saveNickname = () => {
     if (!activeChannel || activeChannel.type !== "dm") return;
     const updated = { ...dmNicknames, [activeChannel.id]: nickDraft.trim() || "" };
@@ -369,11 +345,8 @@ export default function ChatPage({ user, onLogout }) {
   };
 
   const getDmDisplayName = (dmId, fallback) => dmNicknames[dmId]?.trim() || fallback;
-
-  // ── Custom confirm helper ──────────────────────────────────────
   const askConfirm = (title, body, onConfirm) => setConfirmModal({ title, body, onConfirm });
 
-  // ── Delete room (host only) ────────────────────────────────────
   const deleteRoom = (room) => {
     const id   = room?._id   || activeChannel?.id;
     const name = room?.name  || activeChannel?.name;
@@ -396,7 +369,6 @@ export default function ChatPage({ user, onLogout }) {
     );
   };
 
-  // ── Leave room (non-host members) ─────────────────────────────
   const leaveRoom = (room) => {
     const id   = room?._id  || activeChannel?.id;
     const name = room?.name || activeChannel?.name;
@@ -419,7 +391,6 @@ export default function ChatPage({ user, onLogout }) {
     );
   };
 
-  // ── Mute / unmute room (local, localStorage) ──────────────────
   const toggleMuteRoom = (roomId) => {
     setMutedRooms((prev) => {
       const next = new Set(prev);
@@ -429,11 +400,7 @@ export default function ChatPage({ user, onLogout }) {
     });
   };
 
-  // ── Right-click context menu ───────────────────────────────────
-  const openCtxMenu = (e, room) => {
-    e.preventDefault();
-    setCtxMenu({ x: e.clientX, y: e.clientY, room });
-  };
+  const openCtxMenu = (e, room) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, room }); };
   const closeCtxMenu = () => setCtxMenu(null);
 
   const renameRoom = async (e) => {
@@ -467,7 +434,6 @@ export default function ChatPage({ user, onLogout }) {
 
   const changeMyStatus = (s) => setMyStatus(s);
 
-
   const searchInviteUsers = async (q) => {
     setInviteSearch(q);
     if (!q) { setInviteResults([]); return; }
@@ -496,7 +462,6 @@ export default function ChatPage({ user, onLogout }) {
   const startDM = async (targetUsername) => {
     const res = await API.post("/dms", { targetUsername });
     const dm = res.data;
-    // Always ensure status is preserved exactly as server returns it
     setDms((prev) => prev.find((d) => d._id === dm._id) ? prev : [dm, ...prev]);
     const dmName = dm.participants.find((p) => p !== user.username);
     setShowNewDM(false); setDmSearch(""); setDmResults([]);
@@ -508,7 +473,6 @@ export default function ChatPage({ user, onLogout }) {
     try {
       const res = await API.post(`/dms/${activeChannel.id}/accept`);
       await refreshDms();
-      // Update the active channel status to active
       const updated = { ...activeChannel, status: res.data.status };
       openChannel(updated);
     } catch (err) {
@@ -518,7 +482,23 @@ export default function ChatPage({ user, onLogout }) {
 
   const isOnline = (username) => onlineUsers.some((u) => u.username === username);
 
-  // What to show in the messages area
+  const handleMobileSearch = async (q) => {
+    setSearchQuery(q);
+    if (!q.trim()) { setSearchResults({ users: [], rooms: [] }); return; }
+    try {
+      const [usersRes, roomsRes] = await Promise.all([
+        API.get(`/users/search?q=${q}`),
+        API.get("/rooms"),
+      ]);
+      const filteredRooms = roomsRes.data.filter(r =>
+        r.name.toLowerCase().includes(q.toLowerCase())
+      );
+      setSearchResults({ users: usersRes.data, rooms: filteredRooms });
+    } catch {
+      setSearchResults({ users: [], rooms: [] });
+    }
+  };
+
   const renderMessages = () => {
     if (isMember === null) return <div className="empty-chat"><p>Loading…</p></div>;
     if (isPendingDM) {
@@ -550,11 +530,11 @@ export default function ChatPage({ user, onLogout }) {
     }
     if (messages.length === 0) return <div className="empty-chat"><p>No messages yet. Start the conversation.</p></div>;
     return messages.map((m) => (
-      <Message 
-        key={m._id} 
-        msg={m} 
-        isMe={m.senderName?.trim() === user.username?.trim()} 
-        serverUrl={SERVER_URL} 
+      <Message
+        key={m._id}
+        msg={m}
+        isMe={m.senderName?.trim() === user.username?.trim()}
+        serverUrl={SERVER_URL}
         onImageClick={setViewingImage}
         onEdit={startEdit}
         onDelete={deleteMessage}
@@ -562,293 +542,636 @@ export default function ChatPage({ user, onLogout }) {
     ));
   };
 
-  return (
-    <div className="app-layout">
-      {/* Mobile sidebar overlay backdrop */}
-      {mobileSidebarOpen && (
-        <div className="mobile-sidebar-backdrop" onClick={() => setMobileSidebarOpen(false)} />
-      )}
-      <aside className={`sidebar ${mobileSidebarOpen ? "sidebar-open" : ""}`}>
-        <div className="sidebar-top">
-          <div className="brand">
-            <img src="/logo.png" alt="CocoDrop Logo" className="sidebar-logo" />
-            <div>
-              <span className="brand-name">CocoDrop</span>
-              <span className="brand-caption">{onlineCount} online now</span>
-            </div>
-            <button className="search-users-btn" onClick={() => { setShowUserSearch(true); setUserSearchQ(""); setUserSearchResults([]); }} title="Search users">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            </button>
-          </div>
-          <div className="me-pill">
-            <div className="me-avatar-wrap">
-              <AvatarCircle username={user.username} size="sm" label={favoriteLetter} />
-              <span className="me-status-dot" style={{ background: STATUS_OPTIONS.find(s => s.id === myStatus)?.color || "#22c55e" }} />
-            </div>
-            <div className="me-copy">
-              <span className="me-name">{favoriteEmoji} {user.username}</span>
-              <div className="status-pills">
-                {STATUS_OPTIONS.map(s => (
-                  <button key={s.id} className={`status-pill ${myStatus === s.id ? "active" : ""}`}
-                    style={myStatus === s.id ? { borderColor: s.color, color: s.color } : {}}
-                    onClick={() => changeMyStatus(s.id)}>{s.label}</button>
-                ))}
-              </div>
-            </div>
-            <button className="settings-btn" onClick={() => setShowSettings(true)}>Settings</button>
-            <button className="logout-icon" onClick={onLogout}>Exit</button>
-          </div>
-        </div>
+  // ── Mobile sub-components ──────────────────────────────────────
 
-        <div className="sidebar-scroll">
-          <div className="section-head">
-            <span className="section-lbl">Rooms</span>
-            <button className="add-btn" onClick={() => setShowNewRoom(true)}>+</button>
-          </div>
-          {rooms.length === 0 && <p className="sidebar-empty">Create a public or invite-only room.</p>}
-          {rooms.map((room) => (
-            <button
-              key={room._id}
-              className={`ch-item ${activeChannel?.id === room._id ? "ch-active" : ""} ${mutedRooms.has(room._id) ? "ch-muted" : ""}`}
-              onClick={() => openRoom(room)}
-              onContextMenu={(e) => openCtxMenu(e, room)}
-            >
-              <span className="ch-icon">
-                {room.isPrivate ? (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                ) : (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
-                )}
+  const DMCirclesRow = () => (
+    <div className="dm-circles-row">
+      {dms.map((dm) => {
+        const other = dm.participants.find((p) => p !== user.username);
+        return (
+          <button key={dm._id} className="dm-circle-btn" onClick={() => openDM(dm)}>
+            <div className="dm-circle-wrap">
+              <AvatarCircle username={other} size="md" />
+              <span className="dm-moon-badge">🌙</span>
+              {unreadCounts[dm._id] > 0 && <span className="dm-unread-dot" />}
+            </div>
+            <span className="dm-circle-name">{other.slice(0, 8)}</span>
+          </button>
+        );
+      })}
+      <button className="dm-circle-btn" onClick={() => setShowNewDM(true)}>
+        <div className="dm-circle-wrap add-circle">
+          <span>+</span>
+        </div>
+        <span className="dm-circle-name">New DM</span>
+      </button>
+    </div>
+  );
+
+  const HomeTab = () => (
+    <div className="mobile-feed">
+      <div className="feed-section">
+        <p className="feed-section-label">Direct Messages</p>
+        <DMCirclesRow />
+      </div>
+      <div className="feed-section">
+        <p className="feed-section-label">Recent Rooms</p>
+        {rooms.length === 0 && <p className="feed-empty">No rooms yet. Create one!</p>}
+        {rooms.map((room) => (
+          <button
+            key={room._id}
+            className={`feed-room-item ${mutedRooms.has(room._id) ? "ch-muted" : ""}`}
+            onClick={() => openRoom(room)}
+            onContextMenu={(e) => openCtxMenu(e, room)}
+          >
+            <span className="feed-room-icon">
+              {room.isPrivate ? "🔒" : "#"}
+            </span>
+            <div className="feed-room-info">
+              <span className="feed-room-name">{room.name}</span>
+              <span className="feed-room-sub">
+                {room.isPrivate ? "Private" : "Public"} · {room.createdBy === user.username ? "Host" : (room.isMember ? "Member" : "Open")}
               </span>
-              <span className="ch-name">
-                {room.name}
-                {mutedRooms.has(room._id) && (
-                  <span className="mute-icon">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-                  </span>
-                )}
-              </span>
-              <span className={`ch-badge ${room.isPrivate ? "private" : "public"}`}>
-                {room.isPrivate ? "Invite" : (room.isMember ? "Joined" : "Open")}
-              </span>
-              {room.createdBy === user.username && <span className="ch-badge host-badge">Host</span>}
-              {unreadCounts[room._id] > 0 && (
-                <span className="unread-badge">{unreadCounts[room._id]}</span>
-              )}
+            </div>
+            {unreadCounts[room._id] > 0 && (
+              <span className="unread-badge">{unreadCounts[room._id]}</span>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const RoomsTab = () => {
+    const myRooms = rooms.filter(r => r.isPrivate);
+    const publicRooms = rooms.filter(r => !r.isPrivate);
+    return (
+      <div className="mobile-feed">
+        <div className="feed-section">
+          <p className="feed-section-label">Private Rooms</p>
+          {myRooms.length === 0 && <p className="feed-empty">No private rooms yet.</p>}
+          {myRooms.map((room) => (
+            <button key={room._id} className="feed-room-item" onClick={() => openRoom(room)} onContextMenu={(e) => openCtxMenu(e, room)}>
+              <span className="feed-room-icon">🔒</span>
+              <div className="feed-room-info">
+                <span className="feed-room-name">{room.name}</span>
+                <span className="feed-room-sub">Invite only · {room.createdBy === user.username ? "Host" : "Member"}</span>
+              </div>
+              {unreadCounts[room._id] > 0 && <span className="unread-badge">{unreadCounts[room._id]}</span>}
             </button>
           ))}
-
-          {/* Discoverable public rooms not yet joined */}
-          {rooms.filter(r => !r.isPrivate && !r.isMember).length > 0 && (
-            <>
-              <p className="discover-label">Discover rooms nearby</p>
-              {rooms.filter(r => !r.isPrivate && !r.isMember).map(room => (
-                <button key={`disc-${room._id}`} className="ch-item discover-item" onClick={() => openRoom(room)}>
-                  <span className="ch-icon">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
-                  </span>
-                  <span className="ch-name">{room.name}</span>
-                  <span className="ch-badge public">Join</span>
-                </button>
-              ))}
-            </>
-          )}
-
-          <div className="section-head spaced">
-            <span className="section-lbl">Direct Messages</span>
-            <button className="add-btn" onClick={() => setShowNewDM(true)}>+</button>
-          </div>
-          {dms.length === 0 && <p className="sidebar-empty">Start a personal DM with any user.</p>}
-          {dms.map((dm) => {
-            const other = dm.participants.find((p) => p !== user.username);
-            const displayName = getDmDisplayName(dm._id, other);
-            return (
-              <button
-                key={dm._id}
-                className={`ch-item ${activeChannel?.id === dm._id ? "ch-active" : ""}`}
-                onClick={() => openChannel({ id: dm._id, name: other, type: "dm", status: dm.status, requestedBy: dm.requestedBy })}
-              >
-                <AvatarCircle username={other} size="sm" />
-                <span className="ch-name">{displayName}</span>
-                {dm.status === "pending" && (
-                  <span className={`ch-badge ${dm.requestedBy === user.username ? "pending" : "private"}`}>
-                    {dm.requestedBy === user.username ? "Sent" : "Request"}
-                  </span>
-                )}
-                {isOnline(other) && <span className="dm-online-dot" />}
-                {unreadCounts[dm._id] > 0 && (
-                  <span className="unread-badge" style={{ marginLeft: "auto" }}>{unreadCounts[dm._id]}</span>
-                )}
-              </button>
-            );
-          })}
         </div>
-      </aside>
-
-      <main className="chat-main">
-        {!activeChannel ? (
-          <div className="welcome-screen">
-            {/* Mobile menu button shown when no channel is active */}
-            <button className="mobile-menu-fab" onClick={() => setMobileSidebarOpen(true)}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
-            </button>
-            <div className="welcome-card">
-              <p className="eyebrow">CocoDrop command center</p>
-              <h2>Pick a room or start a private DM.</h2>
-              <p>Public rooms are open to everyone. Private rooms are invite-only.</p>
-              <div className="welcome-actions">
-                <button className="welcome-pill" onClick={() => setShowNewRoom(true)}>Create Room</button>
-                <button className="welcome-pill outline" onClick={() => setShowNewDM(true)}>Start DM</button>
+        <div className="feed-section">
+          <p className="feed-section-label">Public Rooms</p>
+          {publicRooms.length === 0 && <p className="feed-empty">No public rooms yet.</p>}
+          {publicRooms.map((room) => (
+            <button key={room._id} className="feed-room-item" onClick={() => openRoom(room)} onContextMenu={(e) => openCtxMenu(e, room)}>
+              <span className="feed-room-icon">#</span>
+              <div className="feed-room-info">
+                <span className="feed-room-name">{room.name}</span>
+                <span className="feed-room-sub">Open · {room.isMember ? "Joined" : "Tap to join"}</span>
               </div>
+              {unreadCounts[room._id] > 0 && <span className="unread-badge">{unreadCounts[room._id]}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const SearchTab = () => (
+    <div className="mobile-feed">
+      <div className="feed-section">
+        <input
+          className="mobile-search-input"
+          placeholder="Search users and rooms…"
+          value={searchQuery}
+          onChange={(e) => handleMobileSearch(e.target.value)}
+          autoFocus
+        />
+        {searchQuery && (
+          <>
+            {searchResults.users.length > 0 && (
+              <>
+                <p className="feed-section-label" style={{ marginTop: 16 }}>Users</p>
+                {searchResults.users.map((item) => (
+                  <button key={item.username} className="feed-room-item" onClick={() => startDM(item.username)}>
+                    <AvatarCircle username={item.username} size="md" />
+                    <div className="feed-room-info">
+                      <span className="feed-room-name">{item.username}</span>
+                      <span className="feed-room-sub">{isOnline(item.username) ? "Online" : "Offline"}</span>
+                    </div>
+                    <span className="invite-add-btn">DM</span>
+                  </button>
+                ))}
+              </>
+            )}
+            {searchResults.rooms.length > 0 && (
+              <>
+                <p className="feed-section-label" style={{ marginTop: 16 }}>Rooms</p>
+                {searchResults.rooms.map((room) => (
+                  <button key={room._id} className="feed-room-item" onClick={() => openRoom(room)}>
+                    <span className="feed-room-icon">{room.isPrivate ? "🔒" : "#"}</span>
+                    <div className="feed-room-info">
+                      <span className="feed-room-name">{room.name}</span>
+                      <span className="feed-room-sub">{room.isPrivate ? "Private" : "Public"}</span>
+                    </div>
+                  </button>
+                ))}
+              </>
+            )}
+            {searchResults.users.length === 0 && searchResults.rooms.length === 0 && (
+              <p className="feed-empty">No results for "{searchQuery}"</p>
+            )}
+          </>
+        )}
+        {!searchQuery && <p className="feed-empty">Type to search users and rooms.</p>}
+      </div>
+    </div>
+  );
+
+  const BottomNav = () => (
+    <div className="bottom-nav-capsule">
+      {/* Home button */}
+      <button
+        className={`nav-icon-btn ${activeTab === "home" ? "active" : ""}`}
+        onClick={() => setActiveTab("home")}
+        title="Home"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+      </button>
+      {/* Rooms button */}
+      <button
+        className={`nav-icon-btn ${activeTab === "rooms" ? "active" : ""}`}
+        onClick={() => setActiveTab("rooms")}
+        title="Rooms"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/>
+          <line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/>
+        </svg>
+      </button>
+      {/* Center action button */}
+      <div className="nav-center-wrap">
+        {showNavPopup && (
+          <div className="nav-popup">
+            <button onClick={() => { setShowNewRoom(true); setShowNavPopup(false); }}>
+              🏠 New Room
+            </button>
+            <button onClick={() => { setShowNewDM(true); setShowNavPopup(false); }}>
+              💬 New DM
+            </button>
+          </div>
+        )}
+        <button
+          className="nav-center-btn"
+          onClick={() => setShowNavPopup((v) => !v)}
+          title="New"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+        </button>
+      </div>
+      {/* Search button */}
+      <button
+        className={`nav-icon-btn ${activeTab === "search" ? "active" : ""}`}
+        onClick={() => setActiveTab("search")}
+        title="Search"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+        </svg>
+      </button>
+      {/* Settings button */}
+      <button
+        className="nav-icon-btn"
+        onClick={() => setShowSettings(true)}
+        title="Settings"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+  );
+
+  const MainFeed = () => (
+    <div className="mobile-main-feed">
+      {/* Top bar */}
+      <div className="mobile-topbar">
+        <div className="mobile-brand">
+          <img src="/logo.png" alt="CocoDrop" className="mobile-brand-logo" />
+          <span className="mobile-brand-name">CocoDrop</span>
+        </div>
+        <div className="mobile-topbar-right">
+          <span className="mobile-online-count">{onlineCount} online</span>
+          <div className="me-avatar-wrap" style={{ position: "relative" }}>
+            <AvatarCircle username={user.username} size="sm" label={favoriteLetter} />
+            <span className="me-status-dot" style={{ background: STATUS_OPTIONS.find(s => s.id === myStatus)?.color || "#22c55e" }} />
+          </div>
+        </div>
+      </div>
+      {/* Tab content */}
+      {activeTab === "home" && <HomeTab />}
+      {activeTab === "rooms" && <RoomsTab />}
+      {activeTab === "search" && <SearchTab />}
+    </div>
+  );
+
+  const ChatView = () => (
+    <div className="cd-chat-view">
+      <div className="chat-header">
+        <div className="chat-header-left">
+          <button className="mobile-back-btn" onClick={() => setActiveChannel(null)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 18l-6-6 6-6"/>
+            </svg>
+          </button>
+          <span className="chat-header-icon">
+            {activeChannel.type === "dm"
+              ? <AvatarCircle username={activeChannel.name} size="sm" />
+              : (activeChannel.isPrivate ? "🔒" : "#")}
+          </span>
+          <div>
+            {activeChannel.type === "dm" && editingNick ? (
+              <div className="nick-edit-row">
+                <input
+                  className="nick-input"
+                  value={nickDraft}
+                  onChange={(e) => setNickDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") saveNickname(); if (e.key === "Escape") setEditingNick(false); }}
+                  placeholder={activeChannel.name}
+                  autoFocus
+                />
+                <button className="nick-save-btn" onClick={saveNickname}>Save</button>
+                <button className="nick-cancel-btn" onClick={() => setEditingNick(false)}>✕</button>
+              </div>
+            ) : (
+              <p className="chat-header-name">
+                {activeChannel.type === "dm"
+                  ? getDmDisplayName(activeChannel.id, activeChannel.name)
+                  : `#${activeChannel.name}`}
+                {activeChannel.type === "dm" && (
+                  <button className="nick-edit-btn" title="Set nickname"
+                    onClick={() => { setNickDraft(dmNicknames[activeChannel.id] || ""); setEditingNick(true); }}>✎</button>
+                )}
+              </p>
+            )}
+            <p className="chat-header-sub">
+              {activeChannel.type === "dm"
+                ? (isPendingDM
+                  ? (isPendingDMRequester ? "DM request sent — waiting for acceptance" : "DM request — needs your approval")
+                  : `@${activeChannel.name} · ${isOnline(activeChannel.name) ? "Online" : "Offline"}`)
+                : (activeChannel.isPrivate ? "Private invite-only room" : "Public room")}
+            </p>
+          </div>
+        </div>
+        <div className="chat-header-actions">
+          {activeChannel.type === "room" && (
+            <span className={`privacy-pill ${activeChannel.isPrivate ? "private" : "public"}`}>
+              {activeChannel.isPrivate ? "Invite only" : "Open room"}
+            </span>
+          )}
+          {isPendingDM && !isPendingDMRequester && (
+            <button className="header-action-btn" onClick={acceptDM}>Accept DM</button>
+          )}
+          {activeChannel.type === "room" && (
+            <button className="header-action-btn" onClick={openMembers}>Members</button>
+          )}
+          {activeChannel.type === "room" && isCreator && (
+            <button className="header-action-btn" onClick={() => { setRenameDraft(activeChannel.name); setShowRename(true); }}>Rename</button>
+          )}
+          {activeChannel.type === "room" && isCreator && activeChannel.isPrivate && (
+            <button className="header-action-btn" onClick={() => { setShowInvite(true); setInviteStatus(""); }}>Invite</button>
+          )}
+          {activeChannel.type === "room" && isCreator && (
+            <button className="header-action-btn danger-btn" onClick={() => deleteRoom()}>Delete</button>
+          )}
+        </div>
+      </div>
+
+      <div className="messages-area" ref={messagesAreaRef}>
+        {renderMessages()}
+        {typingUser && (
+          <div className="typing-row">
+            <AvatarCircle username={typingUser} size="sm" />
+            <div className="typing-bubble">
+              <span className="typing-name">{typingUser} is typing</span>
+              <span className="typing-dots"><span /><span /><span /></span>
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      <div className="input-bar">
+        {editingMsg ? (
+          <div className="edit-box">
+            <div className="edit-info">Editing Message</div>
+            <div className="edit-controls">
+              <input className="edit-input" value={editDraft} onChange={(e) => setEditDraft(e.target.value)}
+                onKeyDown={(e) => { if(e.key==="Enter") saveEdit(); if(e.key==="Escape") setEditingMsg(null); }} autoFocus />
+              <button className="edit-btn save" onClick={saveEdit}>Save</button>
+              <button className="edit-btn cancel" onClick={() => setEditingMsg(null)}>Cancel</button>
             </div>
           </div>
         ) : (
           <>
-            <div className="chat-header">
-              <div className="chat-header-left">
-                {/* Mobile back button */}
-                <button className="mobile-back-btn" onClick={() => setMobileSidebarOpen(true)}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
-                </button>
-                <span className="chat-header-icon">
-                  {activeChannel.type === "dm"
-                    ? <AvatarCircle username={activeChannel.name} size="sm" />
-                    : (activeChannel.isPrivate ? "LOCK" : "#")}
-                </span>
-                <div>
-                  {activeChannel.type === "dm" && editingNick ? (
-                    <div className="nick-edit-row">
-                      <input
-                        className="nick-input"
-                        value={nickDraft}
-                        onChange={(e) => setNickDraft(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") saveNickname(); if (e.key === "Escape") setEditingNick(false); }}
-                        placeholder={activeChannel.name}
-                        autoFocus
-                      />
-                      <button className="nick-save-btn" onClick={saveNickname}>Save</button>
-                      <button className="nick-cancel-btn" onClick={() => setEditingNick(false)}>✕</button>
-                    </div>
-                  ) : (
-                    <p className="chat-header-name">
-                      {activeChannel.type === "dm"
-                        ? getDmDisplayName(activeChannel.id, activeChannel.name)
-                        : `#${activeChannel.name}`}
-                      {activeChannel.type === "dm" && (
-                        <button
-                          className="nick-edit-btn"
-                          title="Set nickname"
-                          onClick={() => { setNickDraft(dmNicknames[activeChannel.id] || ""); setEditingNick(true); }}
-                        >✎</button>
-                      )}
-                    </p>
-                  )}
-                  <p className="chat-header-sub">
-                    {activeChannel.type === "dm"
-                      ? (isPendingDM
-                        ? (isPendingDMRequester ? "DM request sent — waiting for acceptance" : "DM request — needs your approval")
-                        : `@${activeChannel.name} · ${isOnline(activeChannel.name) ? "Online" : "Offline"}`)
-                      : (activeChannel.isPrivate ? "Private invite-only room" : "Public room")}
-                  </p>
-                </div>
-              </div>
-              <div className="chat-header-actions">
-                {activeChannel.type === "room" && (
-                  <span className={`privacy-pill ${activeChannel.isPrivate ? "private" : "public"}`}>
-                    {activeChannel.isPrivate ? (
-                      <>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                        Invite only
-                      </>
-                    ) : (
-                      <>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
-                        Open room
-                      </>
-                    )}
-                  </span>
-                )}
-                {isPendingDM && (
-                  <span className="privacy-pill private">
-                    {isPendingDMRequester ? "Awaiting approval" : "Pending request"}
-                  </span>
-                )}
-                {isPendingDM && !isPendingDMRequester && (
-                  <button className="header-action-btn" onClick={acceptDM}>Accept DM</button>
-                )}
-                {activeChannel.type === "room" && (
-                  <button className="header-action-btn" onClick={openMembers}>Members</button>
-                )}
-                {activeChannel.type === "room" && isCreator && (
-                  <button className="header-action-btn" onClick={() => { setRenameDraft(activeChannel.name); setShowRename(true); }}>
-                    Rename
-                  </button>
-                )}
-                {activeChannel.type === "room" && isCreator && activeChannel.isPrivate && (
-                  <button className="header-action-btn" onClick={() => { setShowInvite(true); setInviteStatus(""); }}>
-                    Invite
-                  </button>
-                )}
-                {activeChannel.type === "room" && isCreator && (
-                  <button className="header-action-btn danger-btn" onClick={() => deleteRoom()}>
-                    Delete
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="messages-area" ref={messagesAreaRef}>
-              {renderMessages()}
-              {typingUser && (
-                <div className="typing-row">
-                  <AvatarCircle username={typingUser} size="sm" />
-                  <div className="typing-bubble">
-                    <span className="typing-name">{typingUser} is typing</span>
-                    <span className="typing-dots"><span /><span /><span /></span>
-                  </div>
-                </div>
+            <label className="upload-btn">
+              <input type="file" onChange={handleImageUpload} accept="image/*" disabled={uploading || !canSendInActiveChannel} className="hidden-input" />
+              {uploading ? <span className="loader-small" /> : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="attach-icon">
+                  <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/>
+                  <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+                </svg>
               )}
-              <div ref={bottomRef} />
-            </div>
-
-            <div className="input-bar">
-              {editingMsg ? (
-                <div className="edit-box">
-                  <div className="edit-info">Editing Message</div>
-                  <div className="edit-controls">
-                    <input className="edit-input" value={editDraft} onChange={(e) => setEditDraft(e.target.value)} onKeyDown={(e) => { if(e.key==="Enter") saveEdit(); if(e.key==="Escape") setEditingMsg(null); }} autoFocus />
-                    <button className="edit-btn save" onClick={saveEdit}>Save</button>
-                    <button className="edit-btn cancel" onClick={() => setEditingMsg(null)}>Cancel</button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  <label className="upload-btn">
-                    <input type="file" onChange={handleImageUpload} accept="image/*" disabled={uploading || !canSendInActiveChannel} className="hidden-input" />
-                    {uploading ? <span className="loader-small" /> : (
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="attach-icon"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
-                    )}
-                  </label>
-                  <textarea
-                    className="msg-input"
-                    placeholder={canSendInActiveChannel ? "Type a message..." : (isPendingDM ? "Accept DM to start chatting" : "Join this room to chat")}
-                    value={text}
-                    onChange={handleTyping}
-                    onKeyDown={handleKeyDown}
-                    disabled={!canSendInActiveChannel}
-                  />
-                  <button className="send-btn" onClick={sendMessage} disabled={!text.trim() || !canSendInActiveChannel}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                  </button>
-                </>
-              )}
-              {channelError && <p className="composer-error">{channelError}</p>}
-              {uploadError && <p className="composer-error">{uploadError}</p>}
-            </div>
+            </label>
+            <textarea
+              className="msg-input"
+              placeholder={canSendInActiveChannel ? "Type a message..." : (isPendingDM ? "Accept DM to start chatting" : "Join this room to chat")}
+              value={text}
+              onChange={handleTyping}
+              onKeyDown={handleKeyDown}
+              disabled={!canSendInActiveChannel}
+            />
+            <button className="send-btn" onClick={sendMessage} disabled={!text.trim() || !canSendInActiveChannel}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
           </>
         )}
-      </main>
+        {channelError && <p className="composer-error">{channelError}</p>}
+        {uploadError && <p className="composer-error">{uploadError}</p>}
+      </div>
+    </div>
+  );
 
+  // ── Desktop sidebar layout (unchanged for > 680px) ─────────────
+  const DesktopSidebar = () => (
+    <aside className={`sidebar ${mobileSidebarOpen ? "sidebar-open" : ""}`}>
+      <div className="sidebar-top">
+        <div className="brand">
+          <img src="/logo.png" alt="CocoDrop Logo" className="sidebar-logo" />
+          <div>
+            <span className="brand-name">CocoDrop</span>
+            <span className="brand-caption">{onlineCount} online now</span>
+          </div>
+          <button className="search-users-btn" onClick={() => { setShowUserSearch(true); setUserSearchQ(""); setUserSearchResults([]); }} title="Search users">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          </button>
+        </div>
+        <div className="me-pill">
+          <div className="me-avatar-wrap">
+            <AvatarCircle username={user.username} size="sm" label={favoriteLetter} />
+            <span className="me-status-dot" style={{ background: STATUS_OPTIONS.find(s => s.id === myStatus)?.color || "#22c55e" }} />
+          </div>
+          <div className="me-copy">
+            <span className="me-name">{favoriteEmoji} {user.username}</span>
+            <div className="status-pills">
+              {STATUS_OPTIONS.map(s => (
+                <button key={s.id} className={`status-pill ${myStatus === s.id ? "active" : ""}`}
+                  style={myStatus === s.id ? { borderColor: s.color, color: s.color } : {}}
+                  onClick={() => changeMyStatus(s.id)}>{s.label}</button>
+              ))}
+            </div>
+          </div>
+          <button className="settings-btn" onClick={() => setShowSettings(true)}>Settings</button>
+          <button className="logout-icon" onClick={onLogout}>Exit</button>
+        </div>
+      </div>
+      <div className="sidebar-scroll">
+        <div className="section-head">
+          <span className="section-lbl">Rooms</span>
+          <button className="add-btn" onClick={() => setShowNewRoom(true)}>+</button>
+        </div>
+        {rooms.length === 0 && <p className="sidebar-empty">Create a public or invite-only room.</p>}
+        {rooms.map((room) => (
+          <button
+            key={room._id}
+            className={`ch-item ${activeChannel?.id === room._id ? "ch-active" : ""} ${mutedRooms.has(room._id) ? "ch-muted" : ""}`}
+            onClick={() => openRoom(room)}
+            onContextMenu={(e) => openCtxMenu(e, room)}
+          >
+            <span className="ch-icon">
+              {room.isPrivate ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              ) : (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+              )}
+            </span>
+            <span className="ch-name">
+              {room.name}
+              {mutedRooms.has(room._id) && (
+                <span className="mute-icon">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                </span>
+              )}
+            </span>
+            <span className={`ch-badge ${room.isPrivate ? "private" : "public"}`}>
+              {room.isPrivate ? "Invite" : (room.isMember ? "Joined" : "Open")}
+            </span>
+            {room.createdBy === user.username && <span className="ch-badge host-badge">Host</span>}
+            {unreadCounts[room._id] > 0 && <span className="unread-badge">{unreadCounts[room._id]}</span>}
+          </button>
+        ))}
+        {rooms.filter(r => !r.isPrivate && !r.isMember).length > 0 && (
+          <>
+            <p className="discover-label">Discover rooms nearby</p>
+            {rooms.filter(r => !r.isPrivate && !r.isMember).map(room => (
+              <button key={`disc-${room._id}`} className="ch-item discover-item" onClick={() => openRoom(room)}>
+                <span className="ch-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+                </span>
+                <span className="ch-name">{room.name}</span>
+                <span className="ch-badge public">Join</span>
+              </button>
+            ))}
+          </>
+        )}
+        <div className="section-head spaced">
+          <span className="section-lbl">Direct Messages</span>
+          <button className="add-btn" onClick={() => setShowNewDM(true)}>+</button>
+        </div>
+        {dms.length === 0 && <p className="sidebar-empty">Start a personal DM with any user.</p>}
+        {dms.map((dm) => {
+          const other = dm.participants.find((p) => p !== user.username);
+          const displayName = getDmDisplayName(dm._id, other);
+          return (
+            <button
+              key={dm._id}
+              className={`ch-item ${activeChannel?.id === dm._id ? "ch-active" : ""}`}
+              onClick={() => openChannel({ id: dm._id, name: other, type: "dm", status: dm.status, requestedBy: dm.requestedBy })}
+            >
+              <AvatarCircle username={other} size="sm" />
+              <span className="ch-name">{displayName}</span>
+              {dm.status === "pending" && (
+                <span className={`ch-badge ${dm.requestedBy === user.username ? "pending" : "private"}`}>
+                  {dm.requestedBy === user.username ? "Sent" : "Request"}
+                </span>
+              )}
+              {isOnline(other) && <span className="dm-online-dot" />}
+              {unreadCounts[dm._id] > 0 && (
+                <span className="unread-badge" style={{ marginLeft: "auto" }}>{unreadCounts[dm._id]}</span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </aside>
+  );
+
+  const DesktopChatMain = () => (
+    <main className="chat-main">
+      {!activeChannel ? (
+        <div className="welcome-screen">
+          <div className="welcome-card">
+            <p className="eyebrow">CocoDrop command center</p>
+            <h2>Pick a room or start a private DM.</h2>
+            <p>Public rooms are open to everyone. Private rooms are invite-only.</p>
+            <div className="welcome-actions">
+              <button className="welcome-pill" onClick={() => setShowNewRoom(true)}>Create Room</button>
+              <button className="welcome-pill outline" onClick={() => setShowNewDM(true)}>Start DM</button>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="chat-header">
+            <div className="chat-header-left">
+              <span className="chat-header-icon">
+                {activeChannel.type === "dm"
+                  ? <AvatarCircle username={activeChannel.name} size="sm" />
+                  : (activeChannel.isPrivate ? "LOCK" : "#")}
+              </span>
+              <div>
+                {activeChannel.type === "dm" && editingNick ? (
+                  <div className="nick-edit-row">
+                    <input className="nick-input" value={nickDraft}
+                      onChange={(e) => setNickDraft(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") saveNickname(); if (e.key === "Escape") setEditingNick(false); }}
+                      placeholder={activeChannel.name} autoFocus />
+                    <button className="nick-save-btn" onClick={saveNickname}>Save</button>
+                    <button className="nick-cancel-btn" onClick={() => setEditingNick(false)}>✕</button>
+                  </div>
+                ) : (
+                  <p className="chat-header-name">
+                    {activeChannel.type === "dm"
+                      ? getDmDisplayName(activeChannel.id, activeChannel.name)
+                      : `#${activeChannel.name}`}
+                    {activeChannel.type === "dm" && (
+                      <button className="nick-edit-btn" title="Set nickname"
+                        onClick={() => { setNickDraft(dmNicknames[activeChannel.id] || ""); setEditingNick(true); }}>✎</button>
+                    )}
+                  </p>
+                )}
+                <p className="chat-header-sub">
+                  {activeChannel.type === "dm"
+                    ? (isPendingDM
+                      ? (isPendingDMRequester ? "DM request sent — waiting for acceptance" : "DM request — needs your approval")
+                      : `@${activeChannel.name} · ${isOnline(activeChannel.name) ? "Online" : "Offline"}`)
+                    : (activeChannel.isPrivate ? "Private invite-only room" : "Public room")}
+                </p>
+              </div>
+            </div>
+            <div className="chat-header-actions">
+              {activeChannel.type === "room" && (
+                <span className={`privacy-pill ${activeChannel.isPrivate ? "private" : "public"}`}>
+                  {activeChannel.isPrivate ? (
+                    <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Invite only</>
+                  ) : (
+                    <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>Open room</>
+                  )}
+                </span>
+              )}
+              {isPendingDM && (
+                <span className="privacy-pill private">
+                  {isPendingDMRequester ? "Awaiting approval" : "Pending request"}
+                </span>
+              )}
+              {isPendingDM && !isPendingDMRequester && (
+                <button className="header-action-btn" onClick={acceptDM}>Accept DM</button>
+              )}
+              {activeChannel.type === "room" && (
+                <button className="header-action-btn" onClick={openMembers}>Members</button>
+              )}
+              {activeChannel.type === "room" && isCreator && (
+                <button className="header-action-btn" onClick={() => { setRenameDraft(activeChannel.name); setShowRename(true); }}>Rename</button>
+              )}
+              {activeChannel.type === "room" && isCreator && activeChannel.isPrivate && (
+                <button className="header-action-btn" onClick={() => { setShowInvite(true); setInviteStatus(""); }}>Invite</button>
+              )}
+              {activeChannel.type === "room" && isCreator && (
+                <button className="header-action-btn danger-btn" onClick={() => deleteRoom()}>Delete</button>
+              )}
+            </div>
+          </div>
+          <div className="messages-area" ref={messagesAreaRef}>
+            {renderMessages()}
+            {typingUser && (
+              <div className="typing-row">
+                <AvatarCircle username={typingUser} size="sm" />
+                <div className="typing-bubble">
+                  <span className="typing-name">{typingUser} is typing</span>
+                  <span className="typing-dots"><span /><span /><span /></span>
+                </div>
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
+          <div className="input-bar">
+            {editingMsg ? (
+              <div className="edit-box">
+                <div className="edit-info">Editing Message</div>
+                <div className="edit-controls">
+                  <input className="edit-input" value={editDraft} onChange={(e) => setEditDraft(e.target.value)}
+                    onKeyDown={(e) => { if(e.key==="Enter") saveEdit(); if(e.key==="Escape") setEditingMsg(null); }} autoFocus />
+                  <button className="edit-btn save" onClick={saveEdit}>Save</button>
+                  <button className="edit-btn cancel" onClick={() => setEditingMsg(null)}>Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <label className="upload-btn">
+                  <input type="file" onChange={handleImageUpload} accept="image/*" disabled={uploading || !canSendInActiveChannel} className="hidden-input" />
+                  {uploading ? <span className="loader-small" /> : (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="attach-icon">
+                      <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/>
+                      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+                    </svg>
+                  )}
+                </label>
+                <textarea
+                  className="msg-input"
+                  placeholder={canSendInActiveChannel ? "Type a message..." : (isPendingDM ? "Accept DM to start chatting" : "Join this room to chat")}
+                  value={text}
+                  onChange={handleTyping}
+                  onKeyDown={handleKeyDown}
+                  disabled={!canSendInActiveChannel}
+                />
+                <button className="send-btn" onClick={sendMessage} disabled={!text.trim() || !canSendInActiveChannel}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                  </svg>
+                </button>
+              </>
+            )}
+            {channelError && <p className="composer-error">{channelError}</p>}
+            {uploadError && <p className="composer-error">{uploadError}</p>}
+          </div>
+        </>
+      )}
+    </main>
+  );
+
+  // ── Shared modals ──────────────────────────────────────────────
+  const Modals = () => (
+    <>
       {showNewRoom && (
         <div className="modal-overlay" onClick={() => setShowNewRoom(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
@@ -926,6 +1249,20 @@ export default function ChatPage({ user, onLogout }) {
                 ))}
               </div>
             </section>
+            <section className="settings-section">
+              <div className="settings-section-head"><span>Status</span><small>Your current presence</small></div>
+              <div className="status-pills" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {STATUS_OPTIONS.map(s => (
+                  <button key={s.id} className={`status-pill ${myStatus === s.id ? "active" : ""}`}
+                    style={myStatus === s.id ? { borderColor: s.color, color: s.color } : {}}
+                    onClick={() => changeMyStatus(s.id)}>{s.label}</button>
+                ))}
+              </div>
+            </section>
+            <section className="settings-section">
+              <div className="settings-section-head"><span>Account</span></div>
+              <button className="btn-secondary" style={{ width: "100%" }} onClick={onLogout}>Sign Out</button>
+            </section>
           </div>
         </div>
       )}
@@ -976,7 +1313,6 @@ export default function ChatPage({ user, onLogout }) {
         </div>
       )}
 
-      {/* ── Rename Room Modal ── */}
       {showRename && (
         <div className="modal-overlay" onClick={() => setShowRename(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
@@ -985,13 +1321,7 @@ export default function ChatPage({ user, onLogout }) {
               <button className="modal-close" onClick={() => setShowRename(false)}>Close</button>
             </div>
             <form onSubmit={renameRoom}>
-              <input
-                className="modal-input"
-                placeholder="New room name"
-                value={renameDraft}
-                onChange={(e) => setRenameDraft(e.target.value)}
-                autoFocus
-              />
+              <input className="modal-input" placeholder="New room name" value={renameDraft} onChange={(e) => setRenameDraft(e.target.value)} autoFocus />
               <div className="modal-footer">
                 <button type="button" className="btn-secondary" onClick={() => setShowRename(false)}>Cancel</button>
                 <button type="submit" className="btn-primary" disabled={!renameDraft.trim()}>Save Name</button>
@@ -1001,7 +1331,6 @@ export default function ChatPage({ user, onLogout }) {
         </div>
       )}
 
-      {/* ── Custom Confirm Modal ── */}
       {confirmModal && (
         <div className="modal-overlay" style={{ zIndex: 2000 }} onClick={() => setConfirmModal(null)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
@@ -1021,7 +1350,6 @@ export default function ChatPage({ user, onLogout }) {
         </div>
       )}
 
-      {/* ── Right-Click Context Menu ── */}
       {ctxMenu && (
         <>
           <div className="ctx-overlay" onClick={closeCtxMenu} onContextMenu={(e) => { e.preventDefault(); closeCtxMenu(); }} />
@@ -1039,31 +1367,18 @@ export default function ChatPage({ user, onLogout }) {
                 </button>
               </>
             ) : (
-              <>
-                <button className="ctx-item" onClick={() => { closeCtxMenu(); leaveRoom(ctxMenu.room); }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-                  Leave Room
-                </button>
-              </>
+              <button className="ctx-item" onClick={() => { closeCtxMenu(); leaveRoom(ctxMenu.room); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                Leave Room
+              </button>
             )}
             <button className="ctx-item" onClick={() => { closeCtxMenu(); toggleMuteRoom(ctxMenu.room._id); }}>
-              {mutedRooms.has(ctxMenu.room._id) ? (
-                <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
-                  Unmute Room
-                </>
-              ) : (
-                <>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-                  Mute Room
-                </>
-              )}
+              {mutedRooms.has(ctxMenu.room._id) ? "Unmute Room" : "Mute Room"}
             </button>
           </div>
         </>
       )}
 
-      {/* ── Members Panel ── */}
       {showMembers && (
         <div className="modal-overlay" onClick={() => setShowMembers(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
@@ -1098,7 +1413,6 @@ export default function ChatPage({ user, onLogout }) {
         </div>
       )}
 
-      {/* ── User Search Modal ── */}
       {showUserSearch && (
         <div className="modal-overlay" onClick={() => setShowUserSearch(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
@@ -1106,13 +1420,7 @@ export default function ChatPage({ user, onLogout }) {
               <span className="modal-title">Search Users</span>
               <button className="modal-close" onClick={() => setShowUserSearch(false)}>Close</button>
             </div>
-            <input
-              className="modal-input"
-              placeholder="Type a username…"
-              value={userSearchQ}
-              onChange={(e) => searchUsersGlobal(e.target.value)}
-              autoFocus
-            />
+            <input className="modal-input" placeholder="Type a username…" value={userSearchQ} onChange={(e) => searchUsersGlobal(e.target.value)} autoFocus />
             <div className="search-list">
               {userSearchResults.map((item) => {
                 const ou = getOnlineUser(item.username);
@@ -1149,7 +1457,40 @@ export default function ChatPage({ user, onLogout }) {
           <img src={viewingImage} className="lightbox-content" onClick={(e) => e.stopPropagation()} alt="View" />
         </div>
       )}
+    </>
+  );
 
-    </div>
+  // ── Main render ────────────────────────────────────────────────
+  return (
+    <>
+      {/* ── Desktop layout (> 680px) ── */}
+      <div className="app-layout desktop-layout">
+        {mobileSidebarOpen && (
+          <div className="mobile-sidebar-backdrop" onClick={() => setMobileSidebarOpen(false)} />
+        )}
+        <DesktopSidebar />
+        <DesktopChatMain />
+      </div>
+
+      {/* ── Mobile layout (≤ 680px) ── */}
+      <div className="cd-app mobile-layout">
+        {/* Close nav popup when tapping outside */}
+        {showNavPopup && (
+          <div className="nav-popup-backdrop" onClick={() => setShowNavPopup(false)} />
+        )}
+
+        {activeChannel ? (
+          <ChatView />
+        ) : (
+          <>
+            <MainFeed />
+            <BottomNav />
+          </>
+        )}
+      </div>
+
+      {/* Shared modals — always rendered on top */}
+      <Modals />
+    </>
   );
 }
