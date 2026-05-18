@@ -957,6 +957,7 @@ export default function ChatPage({ user, onLogout }) {
               <div className="mobile-topbar">
                 <div className="mobile-brand">
                   <img src="/favicon.png" alt="CocoDrop" className="mobile-brand-logo" />
+                  <span className="mobile-brand-name">CocoDrop</span>
                 </div>
                 <div className="mobile-topbar-right">
                   <span className="mobile-online-count">{onlineCount} online</span>
