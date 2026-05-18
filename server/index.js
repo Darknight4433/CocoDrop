@@ -57,13 +57,35 @@ handleSocket(io);
 // ── Keep-alive ping (prevents Render free tier spin-down) ────
 // Pings itself every 14 minutes so the server never goes idle
 const SELF_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${process.env.PORT || 4000}`;
-setInterval(() => {
-  http.get(`${SELF_URL}/ping`, (res) => {
-    console.log(`🏓 keep-alive ping → ${res.statusCode}`);
-  }).on("error", (err) => {
-    console.warn("keep-alive ping failed:", err.message);
-  });
-}, 14 * 60 * 1000); // every 14 minutes
+
+function keepAlivePing() {
+  try {
+    // Use https for Render (https URL), http for local
+    const isHttps = SELF_URL.startsWith("https");
+    const transport = isHttps ? require("https") : http;
+    const req = transport.get(`${SELF_URL}/ping`, (res) => {
+      console.log(`🏓 keep-alive ping → ${res.statusCode}`);
+    });
+    req.on("error", (err) => console.warn("keep-alive ping failed:", err.message));
+    req.setTimeout(10000, () => { req.destroy(); });
+  } catch (err) {
+    console.warn("keep-alive error:", err.message);
+  }
+}
+
+// Start pinging after 1 min (give server time to fully start), then every 14 min
+setTimeout(() => {
+  keepAlivePing();
+  setInterval(keepAlivePing, 14 * 60 * 1000);
+}, 60 * 1000);
+
+// ── Global error handlers (prevent crashes from unhandled errors) ────
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err.message);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Rejection:", reason);
+});
 
 // ── Start ────────────────────────────────────────────────────
 const PORT = process.env.PORT || 4000;

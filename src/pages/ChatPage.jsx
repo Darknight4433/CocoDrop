@@ -542,636 +542,644 @@ export default function ChatPage({ user, onLogout }) {
     ));
   };
 
-  // ── Mobile sub-components ──────────────────────────────────────
+  // ── Main render ────────────────────────────────────────────────
+  // NOTE: All JSX is inlined here — NO inner component functions.
+  // This prevents React from unmounting/remounting the textarea on every keystroke.
 
-  const DMCirclesRow = () => (
-    <div className="dm-circles-row">
-      {dms.map((dm) => {
-        const other = dm.participants.find((p) => p !== user.username);
-        return (
-          <button key={dm._id} className="dm-circle-btn" onClick={() => openDM(dm)}>
-            <div className="dm-circle-wrap">
-              <AvatarCircle username={other} size="md" />
-              <span className="dm-moon-badge">🌙</span>
-              {unreadCounts[dm._id] > 0 && <span className="dm-unread-dot" />}
-            </div>
-            <span className="dm-circle-name">{other.slice(0, 8)}</span>
-          </button>
-        );
-      })}
-      <button className="dm-circle-btn" onClick={() => setShowNewDM(true)}>
-        <div className="dm-circle-wrap add-circle">
-          <span>+</span>
-        </div>
-        <span className="dm-circle-name">New DM</span>
-      </button>
-    </div>
-  );
+  // Derived values for RoomsTab (computed inline to avoid inner components)
+  const myPrivateRooms = rooms.filter(r => r.isPrivate);
+  const publicRooms = rooms.filter(r => !r.isPrivate);
 
-  const HomeTab = () => (
-    <div className="mobile-feed">
-      <div className="feed-section">
-        <p className="feed-section-label">Direct Messages</p>
-        <DMCirclesRow />
-      </div>
-      <div className="feed-section">
-        <p className="feed-section-label">Recent Rooms</p>
-        {rooms.length === 0 && <p className="feed-empty">No rooms yet. Create one!</p>}
-        {rooms.map((room) => (
-          <button
-            key={room._id}
-            className={`feed-room-item ${mutedRooms.has(room._id) ? "ch-muted" : ""}`}
-            onClick={() => openRoom(room)}
-            onContextMenu={(e) => openCtxMenu(e, room)}
-          >
-            <span className="feed-room-icon">
-              {room.isPrivate ? "🔒" : "#"}
-            </span>
-            <div className="feed-room-info">
-              <span className="feed-room-name">{room.name}</span>
-              <span className="feed-room-sub">
-                {room.isPrivate ? "Private" : "Public"} · {room.createdBy === user.username ? "Host" : (room.isMember ? "Member" : "Open")}
-              </span>
-            </div>
-            {unreadCounts[room._id] > 0 && (
-              <span className="unread-badge">{unreadCounts[room._id]}</span>
-            )}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+  return (
+    <>
+      {/* ── Desktop layout (> 680px) ── */}
+      <div className="app-layout desktop-layout">
+        {mobileSidebarOpen && (
+          <div className="mobile-sidebar-backdrop" onClick={() => setMobileSidebarOpen(false)} />
+        )}
 
-  const RoomsTab = () => {
-    const myRooms = rooms.filter(r => r.isPrivate);
-    const publicRooms = rooms.filter(r => !r.isPrivate);
-    return (
-      <div className="mobile-feed">
-        <div className="feed-section">
-          <p className="feed-section-label">Private Rooms</p>
-          {myRooms.length === 0 && <p className="feed-empty">No private rooms yet.</p>}
-          {myRooms.map((room) => (
-            <button key={room._id} className="feed-room-item" onClick={() => openRoom(room)} onContextMenu={(e) => openCtxMenu(e, room)}>
-              <span className="feed-room-icon">🔒</span>
-              <div className="feed-room-info">
-                <span className="feed-room-name">{room.name}</span>
-                <span className="feed-room-sub">Invite only · {room.createdBy === user.username ? "Host" : "Member"}</span>
+        {/* Desktop Sidebar */}
+        <aside className={`sidebar ${mobileSidebarOpen ? "sidebar-open" : ""}`}>
+          <div className="sidebar-top">
+            <div className="brand">
+              <img src="/logo.png" alt="CocoDrop Logo" className="sidebar-logo" />
+              <div>
+                <span className="brand-name">CocoDrop</span>
+                <span className="brand-caption">{onlineCount} online now</span>
               </div>
-              {unreadCounts[room._id] > 0 && <span className="unread-badge">{unreadCounts[room._id]}</span>}
-            </button>
-          ))}
-        </div>
-        <div className="feed-section">
-          <p className="feed-section-label">Public Rooms</p>
-          {publicRooms.length === 0 && <p className="feed-empty">No public rooms yet.</p>}
-          {publicRooms.map((room) => (
-            <button key={room._id} className="feed-room-item" onClick={() => openRoom(room)} onContextMenu={(e) => openCtxMenu(e, room)}>
-              <span className="feed-room-icon">#</span>
-              <div className="feed-room-info">
-                <span className="feed-room-name">{room.name}</span>
-                <span className="feed-room-sub">Open · {room.isMember ? "Joined" : "Tap to join"}</span>
+              <button className="search-users-btn" onClick={() => { setShowUserSearch(true); setUserSearchQ(""); setUserSearchResults([]); }} title="Search users">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              </button>
+            </div>
+            <div className="me-pill">
+              <div className="me-avatar-wrap">
+                <AvatarCircle username={user.username} size="sm" label={favoriteLetter} />
+                <span className="me-status-dot" style={{ background: STATUS_OPTIONS.find(s => s.id === myStatus)?.color || "#22c55e" }} />
               </div>
-              {unreadCounts[room._id] > 0 && <span className="unread-badge">{unreadCounts[room._id]}</span>}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
-  const SearchTab = () => (
-    <div className="mobile-feed">
-      <div className="feed-section">
-        <input
-          className="mobile-search-input"
-          placeholder="Search users and rooms…"
-          value={searchQuery}
-          onChange={(e) => handleMobileSearch(e.target.value)}
-          autoFocus
-        />
-        {searchQuery && (
-          <>
-            {searchResults.users.length > 0 && (
+              <div className="me-copy">
+                <span className="me-name">{favoriteEmoji} {user.username}</span>
+                <div className="status-pills">
+                  {STATUS_OPTIONS.map(s => (
+                    <button key={s.id} className={`status-pill ${myStatus === s.id ? "active" : ""}`}
+                      style={myStatus === s.id ? { borderColor: s.color, color: s.color } : {}}
+                      onClick={() => changeMyStatus(s.id)}>{s.label}</button>
+                  ))}
+                </div>
+              </div>
+              <button className="settings-btn" onClick={() => setShowSettings(true)}>Settings</button>
+              <button className="logout-icon" onClick={onLogout}>Exit</button>
+            </div>
+          </div>
+          <div className="sidebar-scroll">
+            <div className="section-head">
+              <span className="section-lbl">Rooms</span>
+              <button className="add-btn" onClick={() => setShowNewRoom(true)}>+</button>
+            </div>
+            {rooms.length === 0 && <p className="sidebar-empty">Create a public or invite-only room.</p>}
+            {rooms.map((room) => (
+              <button
+                key={room._id}
+                className={`ch-item ${activeChannel?.id === room._id ? "ch-active" : ""} ${mutedRooms.has(room._id) ? "ch-muted" : ""}`}
+                onClick={() => openRoom(room)}
+                onContextMenu={(e) => openCtxMenu(e, room)}
+              >
+                <span className="ch-icon">
+                  {room.isPrivate ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+                  )}
+                </span>
+                <span className="ch-name">
+                  {room.name}
+                  {mutedRooms.has(room._id) && (
+                    <span className="mute-icon">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+                    </span>
+                  )}
+                </span>
+                <span className={`ch-badge ${room.isPrivate ? "private" : "public"}`}>
+                  {room.isPrivate ? "Invite" : (room.isMember ? "Joined" : "Open")}
+                </span>
+                {room.createdBy === user.username && <span className="ch-badge host-badge">Host</span>}
+                {unreadCounts[room._id] > 0 && <span className="unread-badge">{unreadCounts[room._id]}</span>}
+              </button>
+            ))}
+            {rooms.filter(r => !r.isPrivate && !r.isMember).length > 0 && (
               <>
-                <p className="feed-section-label" style={{ marginTop: 16 }}>Users</p>
-                {searchResults.users.map((item) => (
-                  <button key={item.username} className="feed-room-item" onClick={() => startDM(item.username)}>
-                    <AvatarCircle username={item.username} size="md" />
-                    <div className="feed-room-info">
-                      <span className="feed-room-name">{item.username}</span>
-                      <span className="feed-room-sub">{isOnline(item.username) ? "Online" : "Offline"}</span>
-                    </div>
-                    <span className="invite-add-btn">DM</span>
+                <p className="discover-label">Discover rooms nearby</p>
+                {rooms.filter(r => !r.isPrivate && !r.isMember).map(room => (
+                  <button key={`disc-${room._id}`} className="ch-item discover-item" onClick={() => openRoom(room)}>
+                    <span className="ch-icon">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
+                    </span>
+                    <span className="ch-name">{room.name}</span>
+                    <span className="ch-badge public">Join</span>
                   </button>
                 ))}
               </>
             )}
-            {searchResults.rooms.length > 0 && (
-              <>
-                <p className="feed-section-label" style={{ marginTop: 16 }}>Rooms</p>
-                {searchResults.rooms.map((room) => (
-                  <button key={room._id} className="feed-room-item" onClick={() => openRoom(room)}>
-                    <span className="feed-room-icon">{room.isPrivate ? "🔒" : "#"}</span>
-                    <div className="feed-room-info">
-                      <span className="feed-room-name">{room.name}</span>
-                      <span className="feed-room-sub">{room.isPrivate ? "Private" : "Public"}</span>
-                    </div>
-                  </button>
-                ))}
-              </>
-            )}
-            {searchResults.users.length === 0 && searchResults.rooms.length === 0 && (
-              <p className="feed-empty">No results for "{searchQuery}"</p>
-            )}
-          </>
-        )}
-        {!searchQuery && <p className="feed-empty">Type to search users and rooms.</p>}
-      </div>
-    </div>
-  );
-
-  const BottomNav = () => (
-    <div className="bottom-nav-capsule">
-      {/* Home button */}
-      <button
-        className={`nav-icon-btn ${activeTab === "home" ? "active" : ""}`}
-        onClick={() => setActiveTab("home")}
-        title="Home"
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-          <polyline points="9 22 9 12 15 12 15 22"/>
-        </svg>
-      </button>
-      {/* Rooms button */}
-      <button
-        className={`nav-icon-btn ${activeTab === "rooms" ? "active" : ""}`}
-        onClick={() => setActiveTab("rooms")}
-        title="Rooms"
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/>
-          <line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/>
-        </svg>
-      </button>
-      {/* Center action button */}
-      <div className="nav-center-wrap">
-        {showNavPopup && (
-          <div className="nav-popup">
-            <button onClick={() => { setShowNewRoom(true); setShowNavPopup(false); }}>
-              🏠 New Room
-            </button>
-            <button onClick={() => { setShowNewDM(true); setShowNavPopup(false); }}>
-              💬 New DM
-            </button>
+            <div className="section-head spaced">
+              <span className="section-lbl">Direct Messages</span>
+              <button className="add-btn" onClick={() => setShowNewDM(true)}>+</button>
+            </div>
+            {dms.length === 0 && <p className="sidebar-empty">Start a personal DM with any user.</p>}
+            {dms.map((dm) => {
+              const other = dm.participants.find((p) => p !== user.username);
+              const displayName = getDmDisplayName(dm._id, other);
+              return (
+                <button
+                  key={dm._id}
+                  className={`ch-item ${activeChannel?.id === dm._id ? "ch-active" : ""}`}
+                  onClick={() => openChannel({ id: dm._id, name: other, type: "dm", status: dm.status, requestedBy: dm.requestedBy })}
+                >
+                  <AvatarCircle username={other} size="sm" />
+                  <span className="ch-name">{displayName}</span>
+                  {dm.status === "pending" && (
+                    <span className={`ch-badge ${dm.requestedBy === user.username ? "pending" : "private"}`}>
+                      {dm.requestedBy === user.username ? "Sent" : "Request"}
+                    </span>
+                  )}
+                  {isOnline(other) && <span className="dm-online-dot" />}
+                  {unreadCounts[dm._id] > 0 && (
+                    <span className="unread-badge" style={{ marginLeft: "auto" }}>{unreadCounts[dm._id]}</span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-        )}
-        <button
-          className="nav-center-btn"
-          onClick={() => setShowNavPopup((v) => !v)}
-          title="New"
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-        </button>
-      </div>
-      {/* Search button */}
-      <button
-        className={`nav-icon-btn ${activeTab === "search" ? "active" : ""}`}
-        onClick={() => setActiveTab("search")}
-        title="Search"
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
-        </svg>
-      </button>
-      {/* Settings button */}
-      <button
-        className="nav-icon-btn"
-        onClick={() => setShowSettings(true)}
-        title="Settings"
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-        </svg>
-      </button>
-    </div>
-  );
+        </aside>
 
-  const MainFeed = () => (
-    <div className="mobile-main-feed">
-      {/* Top bar */}
-      <div className="mobile-topbar">
-        <div className="mobile-brand">
-          <img src="/logo.png" alt="CocoDrop" className="mobile-brand-logo" />
-          <span className="mobile-brand-name">CocoDrop</span>
-        </div>
-        <div className="mobile-topbar-right">
-          <span className="mobile-online-count">{onlineCount} online</span>
-          <div className="me-avatar-wrap" style={{ position: "relative" }}>
-            <AvatarCircle username={user.username} size="sm" label={favoriteLetter} />
-            <span className="me-status-dot" style={{ background: STATUS_OPTIONS.find(s => s.id === myStatus)?.color || "#22c55e" }} />
-          </div>
-        </div>
-      </div>
-      {/* Tab content */}
-      {activeTab === "home" && <HomeTab />}
-      {activeTab === "rooms" && <RoomsTab />}
-      {activeTab === "search" && <SearchTab />}
-    </div>
-  );
-
-  const ChatView = () => (
-    <div className="cd-chat-view">
-      <div className="chat-header">
-        <div className="chat-header-left">
-          <button className="mobile-back-btn" onClick={() => setActiveChannel(null)}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M15 18l-6-6 6-6"/>
-            </svg>
-          </button>
-          <span className="chat-header-icon">
-            {activeChannel.type === "dm"
-              ? <AvatarCircle username={activeChannel.name} size="sm" />
-              : (activeChannel.isPrivate ? "🔒" : "#")}
-          </span>
-          <div>
-            {activeChannel.type === "dm" && editingNick ? (
-              <div className="nick-edit-row">
-                <input
-                  className="nick-input"
-                  value={nickDraft}
-                  onChange={(e) => setNickDraft(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") saveNickname(); if (e.key === "Escape") setEditingNick(false); }}
-                  placeholder={activeChannel.name}
-                  autoFocus
-                />
-                <button className="nick-save-btn" onClick={saveNickname}>Save</button>
-                <button className="nick-cancel-btn" onClick={() => setEditingNick(false)}>✕</button>
+        {/* Desktop Chat Main */}
+        <main className="chat-main">
+          {!activeChannel ? (
+            <div className="welcome-screen">
+              <div className="welcome-card">
+                <p className="eyebrow">CocoDrop command center</p>
+                <h2>Pick a room or start a private DM.</h2>
+                <p>Public rooms are open to everyone. Private rooms are invite-only.</p>
+                <div className="welcome-actions">
+                  <button className="welcome-pill" onClick={() => setShowNewRoom(true)}>Create Room</button>
+                  <button className="welcome-pill outline" onClick={() => setShowNewDM(true)}>Start DM</button>
+                </div>
               </div>
-            ) : (
-              <p className="chat-header-name">
-                {activeChannel.type === "dm"
-                  ? getDmDisplayName(activeChannel.id, activeChannel.name)
-                  : `#${activeChannel.name}`}
-                {activeChannel.type === "dm" && (
-                  <button className="nick-edit-btn" title="Set nickname"
-                    onClick={() => { setNickDraft(dmNicknames[activeChannel.id] || ""); setEditingNick(true); }}>✎</button>
+            </div>
+          ) : (
+            <>
+              <div className="chat-header">
+                <div className="chat-header-left">
+                  <span className="chat-header-icon">
+                    {activeChannel.type === "dm"
+                      ? <AvatarCircle username={activeChannel.name} size="sm" />
+                      : (activeChannel.isPrivate ? "LOCK" : "#")}
+                  </span>
+                  <div>
+                    {activeChannel.type === "dm" && editingNick ? (
+                      <div className="nick-edit-row">
+                        <input className="nick-input" value={nickDraft}
+                          onChange={(e) => setNickDraft(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") saveNickname(); if (e.key === "Escape") setEditingNick(false); }}
+                          placeholder={activeChannel.name} autoFocus />
+                        <button className="nick-save-btn" onClick={saveNickname}>Save</button>
+                        <button className="nick-cancel-btn" onClick={() => setEditingNick(false)}>✕</button>
+                      </div>
+                    ) : (
+                      <p className="chat-header-name">
+                        {activeChannel.type === "dm"
+                          ? getDmDisplayName(activeChannel.id, activeChannel.name)
+                          : `#${activeChannel.name}`}
+                        {activeChannel.type === "dm" && (
+                          <button className="nick-edit-btn" title="Set nickname"
+                            onClick={() => { setNickDraft(dmNicknames[activeChannel.id] || ""); setEditingNick(true); }}>✎</button>
+                        )}
+                      </p>
+                    )}
+                    <p className="chat-header-sub">
+                      {activeChannel.type === "dm"
+                        ? (isPendingDM
+                          ? (isPendingDMRequester ? "DM request sent — waiting for acceptance" : "DM request — needs your approval")
+                          : `@${activeChannel.name} · ${isOnline(activeChannel.name) ? "Online" : "Offline"}`)
+                        : (activeChannel.isPrivate ? "Private invite-only room" : "Public room")}
+                    </p>
+                  </div>
+                </div>
+                <div className="chat-header-actions">
+                  {activeChannel.type === "room" && (
+                    <span className={`privacy-pill ${activeChannel.isPrivate ? "private" : "public"}`}>
+                      {activeChannel.isPrivate ? (
+                        <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Invite only</>
+                      ) : (
+                        <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>Open room</>
+                      )}
+                    </span>
+                  )}
+                  {isPendingDM && (
+                    <span className="privacy-pill private">
+                      {isPendingDMRequester ? "Awaiting approval" : "Pending request"}
+                    </span>
+                  )}
+                  {isPendingDM && !isPendingDMRequester && (
+                    <button className="header-action-btn" onClick={acceptDM}>Accept DM</button>
+                  )}
+                  {activeChannel.type === "room" && (
+                    <button className="header-action-btn" onClick={openMembers}>Members</button>
+                  )}
+                  {activeChannel.type === "room" && isCreator && (
+                    <button className="header-action-btn" onClick={() => { setRenameDraft(activeChannel.name); setShowRename(true); }}>Rename</button>
+                  )}
+                  {activeChannel.type === "room" && isCreator && activeChannel.isPrivate && (
+                    <button className="header-action-btn" onClick={() => { setShowInvite(true); setInviteStatus(""); }}>Invite</button>
+                  )}
+                  {activeChannel.type === "room" && isCreator && (
+                    <button className="header-action-btn danger-btn" onClick={() => deleteRoom()}>Delete</button>
+                  )}
+                </div>
+              </div>
+              <div className="messages-area" ref={messagesAreaRef}>
+                {renderMessages()}
+                {typingUser && (
+                  <div className="typing-row">
+                    <AvatarCircle username={typingUser} size="sm" />
+                    <div className="typing-bubble">
+                      <span className="typing-name">{typingUser} is typing</span>
+                      <span className="typing-dots"><span /><span /><span /></span>
+                    </div>
+                  </div>
                 )}
-              </p>
-            )}
-            <p className="chat-header-sub">
-              {activeChannel.type === "dm"
-                ? (isPendingDM
-                  ? (isPendingDMRequester ? "DM request sent — waiting for acceptance" : "DM request — needs your approval")
-                  : `@${activeChannel.name} · ${isOnline(activeChannel.name) ? "Online" : "Offline"}`)
-                : (activeChannel.isPrivate ? "Private invite-only room" : "Public room")}
-            </p>
-          </div>
-        </div>
-        <div className="chat-header-actions">
-          {activeChannel.type === "room" && (
-            <span className={`privacy-pill ${activeChannel.isPrivate ? "private" : "public"}`}>
-              {activeChannel.isPrivate ? "Invite only" : "Open room"}
-            </span>
+                <div ref={bottomRef} />
+              </div>
+              <div className="input-bar">
+                {editingMsg ? (
+                  <div className="edit-box">
+                    <div className="edit-info">Editing Message</div>
+                    <div className="edit-controls">
+                      <input className="edit-input" value={editDraft} onChange={(e) => setEditDraft(e.target.value)}
+                        onKeyDown={(e) => { if(e.key==="Enter") saveEdit(); if(e.key==="Escape") setEditingMsg(null); }} autoFocus />
+                      <button className="edit-btn save" onClick={saveEdit}>Save</button>
+                      <button className="edit-btn cancel" onClick={() => setEditingMsg(null)}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <label className="upload-btn">
+                      <input type="file" onChange={handleImageUpload} accept="image/*" disabled={uploading || !canSendInActiveChannel} className="hidden-input" />
+                      {uploading ? <span className="loader-small" /> : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="attach-icon">
+                          <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/>
+                          <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+                        </svg>
+                      )}
+                    </label>
+                    <textarea
+                      className="msg-input"
+                      placeholder={canSendInActiveChannel ? "Type a message..." : (isPendingDM ? "Accept DM to start chatting" : "Join this room to chat")}
+                      value={text}
+                      onChange={handleTyping}
+                      onKeyDown={handleKeyDown}
+                      disabled={!canSendInActiveChannel}
+                      rows={1}
+                    />
+                    <button className="send-btn" onClick={sendMessage} disabled={!text.trim() || !canSendInActiveChannel}>
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                      </svg>
+                    </button>
+                  </>
+                )}
+                {channelError && <p className="composer-error">{channelError}</p>}
+                {uploadError && <p className="composer-error">{uploadError}</p>}
+              </div>
+            </>
           )}
-          {isPendingDM && !isPendingDMRequester && (
-            <button className="header-action-btn" onClick={acceptDM}>Accept DM</button>
-          )}
-          {activeChannel.type === "room" && (
-            <button className="header-action-btn" onClick={openMembers}>Members</button>
-          )}
-          {activeChannel.type === "room" && isCreator && (
-            <button className="header-action-btn" onClick={() => { setRenameDraft(activeChannel.name); setShowRename(true); }}>Rename</button>
-          )}
-          {activeChannel.type === "room" && isCreator && activeChannel.isPrivate && (
-            <button className="header-action-btn" onClick={() => { setShowInvite(true); setInviteStatus(""); }}>Invite</button>
-          )}
-          {activeChannel.type === "room" && isCreator && (
-            <button className="header-action-btn danger-btn" onClick={() => deleteRoom()}>Delete</button>
-          )}
-        </div>
+        </main>
       </div>
 
-      <div className="messages-area" ref={messagesAreaRef}>
-        {renderMessages()}
-        {typingUser && (
-          <div className="typing-row">
-            <AvatarCircle username={typingUser} size="sm" />
-            <div className="typing-bubble">
-              <span className="typing-name">{typingUser} is typing</span>
-              <span className="typing-dots"><span /><span /><span /></span>
-            </div>
-          </div>
+      {/* ── Mobile layout (≤ 680px) ── */}
+      <div className="cd-app mobile-layout">
+        {showNavPopup && (
+          <div className="nav-popup-backdrop" onClick={() => setShowNavPopup(false)} />
         )}
-        <div ref={bottomRef} />
-      </div>
 
-      <div className="input-bar">
-        {editingMsg ? (
-          <div className="edit-box">
-            <div className="edit-info">Editing Message</div>
-            <div className="edit-controls">
-              <input className="edit-input" value={editDraft} onChange={(e) => setEditDraft(e.target.value)}
-                onKeyDown={(e) => { if(e.key==="Enter") saveEdit(); if(e.key==="Escape") setEditingMsg(null); }} autoFocus />
-              <button className="edit-btn save" onClick={saveEdit}>Save</button>
-              <button className="edit-btn cancel" onClick={() => setEditingMsg(null)}>Cancel</button>
+        {activeChannel ? (
+          /* ── Mobile Chat View ── */
+          <div className="cd-chat-view">
+            <div className="chat-header">
+              <div className="chat-header-left">
+                <button className="mobile-back-btn" onClick={() => setActiveChannel(null)}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M15 18l-6-6 6-6"/>
+                  </svg>
+                </button>
+                <span className="chat-header-icon">
+                  {activeChannel.type === "dm"
+                    ? <AvatarCircle username={activeChannel.name} size="sm" />
+                    : (activeChannel.isPrivate ? "🔒" : "#")}
+                </span>
+                <div>
+                  {activeChannel.type === "dm" && editingNick ? (
+                    <div className="nick-edit-row">
+                      <input
+                        className="nick-input"
+                        value={nickDraft}
+                        onChange={(e) => setNickDraft(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") saveNickname(); if (e.key === "Escape") setEditingNick(false); }}
+                        placeholder={activeChannel.name}
+                        autoFocus
+                      />
+                      <button className="nick-save-btn" onClick={saveNickname}>Save</button>
+                      <button className="nick-cancel-btn" onClick={() => setEditingNick(false)}>✕</button>
+                    </div>
+                  ) : (
+                    <p className="chat-header-name">
+                      {activeChannel.type === "dm"
+                        ? getDmDisplayName(activeChannel.id, activeChannel.name)
+                        : `#${activeChannel.name}`}
+                      {activeChannel.type === "dm" && (
+                        <button className="nick-edit-btn" title="Set nickname"
+                          onClick={() => { setNickDraft(dmNicknames[activeChannel.id] || ""); setEditingNick(true); }}>✎</button>
+                      )}
+                    </p>
+                  )}
+                  <p className="chat-header-sub">
+                    {activeChannel.type === "dm"
+                      ? (isPendingDM
+                        ? (isPendingDMRequester ? "DM request sent — waiting for acceptance" : "DM request — needs your approval")
+                        : `@${activeChannel.name} · ${isOnline(activeChannel.name) ? "Online" : "Offline"}`)
+                      : (activeChannel.isPrivate ? "Private invite-only room" : "Public room")}
+                  </p>
+                </div>
+              </div>
+              <div className="chat-header-actions">
+                {activeChannel.type === "room" && (
+                  <span className={`privacy-pill ${activeChannel.isPrivate ? "private" : "public"}`}>
+                    {activeChannel.isPrivate ? "Invite only" : "Open room"}
+                  </span>
+                )}
+                {isPendingDM && !isPendingDMRequester && (
+                  <button className="header-action-btn" onClick={acceptDM}>Accept DM</button>
+                )}
+                {activeChannel.type === "room" && (
+                  <button className="header-action-btn" onClick={openMembers}>Members</button>
+                )}
+                {activeChannel.type === "room" && isCreator && (
+                  <button className="header-action-btn" onClick={() => { setRenameDraft(activeChannel.name); setShowRename(true); }}>Rename</button>
+                )}
+                {activeChannel.type === "room" && isCreator && activeChannel.isPrivate && (
+                  <button className="header-action-btn" onClick={() => { setShowInvite(true); setInviteStatus(""); }}>Invite</button>
+                )}
+                {activeChannel.type === "room" && isCreator && (
+                  <button className="header-action-btn danger-btn" onClick={() => deleteRoom()}>Delete</button>
+                )}
+              </div>
+            </div>
+
+            <div className="messages-area" ref={messagesAreaRef}>
+              {renderMessages()}
+              {typingUser && (
+                <div className="typing-row">
+                  <AvatarCircle username={typingUser} size="sm" />
+                  <div className="typing-bubble">
+                    <span className="typing-name">{typingUser} is typing</span>
+                    <span className="typing-dots"><span /><span /><span /></span>
+                  </div>
+                </div>
+              )}
+              <div ref={bottomRef} />
+            </div>
+
+            <div className="input-bar">
+              {editingMsg ? (
+                <div className="edit-box">
+                  <div className="edit-info">Editing Message</div>
+                  <div className="edit-controls">
+                    <input className="edit-input" value={editDraft} onChange={(e) => setEditDraft(e.target.value)}
+                      onKeyDown={(e) => { if(e.key==="Enter") saveEdit(); if(e.key==="Escape") setEditingMsg(null); }} autoFocus />
+                    <button className="edit-btn save" onClick={saveEdit}>Save</button>
+                    <button className="edit-btn cancel" onClick={() => setEditingMsg(null)}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <label className="upload-btn">
+                    <input type="file" onChange={handleImageUpload} accept="image/*" disabled={uploading || !canSendInActiveChannel} className="hidden-input" />
+                    {uploading ? <span className="loader-small" /> : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="attach-icon">
+                        <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/>
+                        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
+                      </svg>
+                    )}
+                  </label>
+                  <textarea
+                    className="msg-input"
+                    placeholder={canSendInActiveChannel ? "Type a message..." : (isPendingDM ? "Accept DM to start chatting" : "Join this room to chat")}
+                    value={text}
+                    onChange={handleTyping}
+                    onKeyDown={handleKeyDown}
+                    disabled={!canSendInActiveChannel}
+                    rows={1}
+                  />
+                  <button className="send-btn" onClick={sendMessage} disabled={!text.trim() || !canSendInActiveChannel}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                    </svg>
+                  </button>
+                </>
+              )}
+              {channelError && <p className="composer-error">{channelError}</p>}
+              {uploadError && <p className="composer-error">{uploadError}</p>}
             </div>
           </div>
         ) : (
           <>
-            <label className="upload-btn">
-              <input type="file" onChange={handleImageUpload} accept="image/*" disabled={uploading || !canSendInActiveChannel} className="hidden-input" />
-              {uploading ? <span className="loader-small" /> : (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="attach-icon">
-                  <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/>
-                  <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
-                </svg>
-              )}
-            </label>
-            <textarea
-              className="msg-input"
-              placeholder={canSendInActiveChannel ? "Type a message..." : (isPendingDM ? "Accept DM to start chatting" : "Join this room to chat")}
-              value={text}
-              onChange={handleTyping}
-              onKeyDown={handleKeyDown}
-              disabled={!canSendInActiveChannel}
-            />
-            <button className="send-btn" onClick={sendMessage} disabled={!text.trim() || !canSendInActiveChannel}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
-              </svg>
-            </button>
-          </>
-        )}
-        {channelError && <p className="composer-error">{channelError}</p>}
-        {uploadError && <p className="composer-error">{uploadError}</p>}
-      </div>
-    </div>
-  );
-
-  // ── Desktop sidebar layout (unchanged for > 680px) ─────────────
-  const DesktopSidebar = () => (
-    <aside className={`sidebar ${mobileSidebarOpen ? "sidebar-open" : ""}`}>
-      <div className="sidebar-top">
-        <div className="brand">
-          <img src="/logo.png" alt="CocoDrop Logo" className="sidebar-logo" />
-          <div>
-            <span className="brand-name">CocoDrop</span>
-            <span className="brand-caption">{onlineCount} online now</span>
-          </div>
-          <button className="search-users-btn" onClick={() => { setShowUserSearch(true); setUserSearchQ(""); setUserSearchResults([]); }} title="Search users">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-          </button>
-        </div>
-        <div className="me-pill">
-          <div className="me-avatar-wrap">
-            <AvatarCircle username={user.username} size="sm" label={favoriteLetter} />
-            <span className="me-status-dot" style={{ background: STATUS_OPTIONS.find(s => s.id === myStatus)?.color || "#22c55e" }} />
-          </div>
-          <div className="me-copy">
-            <span className="me-name">{favoriteEmoji} {user.username}</span>
-            <div className="status-pills">
-              {STATUS_OPTIONS.map(s => (
-                <button key={s.id} className={`status-pill ${myStatus === s.id ? "active" : ""}`}
-                  style={myStatus === s.id ? { borderColor: s.color, color: s.color } : {}}
-                  onClick={() => changeMyStatus(s.id)}>{s.label}</button>
-              ))}
-            </div>
-          </div>
-          <button className="settings-btn" onClick={() => setShowSettings(true)}>Settings</button>
-          <button className="logout-icon" onClick={onLogout}>Exit</button>
-        </div>
-      </div>
-      <div className="sidebar-scroll">
-        <div className="section-head">
-          <span className="section-lbl">Rooms</span>
-          <button className="add-btn" onClick={() => setShowNewRoom(true)}>+</button>
-        </div>
-        {rooms.length === 0 && <p className="sidebar-empty">Create a public or invite-only room.</p>}
-        {rooms.map((room) => (
-          <button
-            key={room._id}
-            className={`ch-item ${activeChannel?.id === room._id ? "ch-active" : ""} ${mutedRooms.has(room._id) ? "ch-muted" : ""}`}
-            onClick={() => openRoom(room)}
-            onContextMenu={(e) => openCtxMenu(e, room)}
-          >
-            <span className="ch-icon">
-              {room.isPrivate ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
-              )}
-            </span>
-            <span className="ch-name">
-              {room.name}
-              {mutedRooms.has(room._id) && (
-                <span className="mute-icon">
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-                </span>
-              )}
-            </span>
-            <span className={`ch-badge ${room.isPrivate ? "private" : "public"}`}>
-              {room.isPrivate ? "Invite" : (room.isMember ? "Joined" : "Open")}
-            </span>
-            {room.createdBy === user.username && <span className="ch-badge host-badge">Host</span>}
-            {unreadCounts[room._id] > 0 && <span className="unread-badge">{unreadCounts[room._id]}</span>}
-          </button>
-        ))}
-        {rooms.filter(r => !r.isPrivate && !r.isMember).length > 0 && (
-          <>
-            <p className="discover-label">Discover rooms nearby</p>
-            {rooms.filter(r => !r.isPrivate && !r.isMember).map(room => (
-              <button key={`disc-${room._id}`} className="ch-item discover-item" onClick={() => openRoom(room)}>
-                <span className="ch-icon">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>
-                </span>
-                <span className="ch-name">{room.name}</span>
-                <span className="ch-badge public">Join</span>
-              </button>
-            ))}
-          </>
-        )}
-        <div className="section-head spaced">
-          <span className="section-lbl">Direct Messages</span>
-          <button className="add-btn" onClick={() => setShowNewDM(true)}>+</button>
-        </div>
-        {dms.length === 0 && <p className="sidebar-empty">Start a personal DM with any user.</p>}
-        {dms.map((dm) => {
-          const other = dm.participants.find((p) => p !== user.username);
-          const displayName = getDmDisplayName(dm._id, other);
-          return (
-            <button
-              key={dm._id}
-              className={`ch-item ${activeChannel?.id === dm._id ? "ch-active" : ""}`}
-              onClick={() => openChannel({ id: dm._id, name: other, type: "dm", status: dm.status, requestedBy: dm.requestedBy })}
-            >
-              <AvatarCircle username={other} size="sm" />
-              <span className="ch-name">{displayName}</span>
-              {dm.status === "pending" && (
-                <span className={`ch-badge ${dm.requestedBy === user.username ? "pending" : "private"}`}>
-                  {dm.requestedBy === user.username ? "Sent" : "Request"}
-                </span>
-              )}
-              {isOnline(other) && <span className="dm-online-dot" />}
-              {unreadCounts[dm._id] > 0 && (
-                <span className="unread-badge" style={{ marginLeft: "auto" }}>{unreadCounts[dm._id]}</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </aside>
-  );
-
-  const DesktopChatMain = () => (
-    <main className="chat-main">
-      {!activeChannel ? (
-        <div className="welcome-screen">
-          <div className="welcome-card">
-            <p className="eyebrow">CocoDrop command center</p>
-            <h2>Pick a room or start a private DM.</h2>
-            <p>Public rooms are open to everyone. Private rooms are invite-only.</p>
-            <div className="welcome-actions">
-              <button className="welcome-pill" onClick={() => setShowNewRoom(true)}>Create Room</button>
-              <button className="welcome-pill outline" onClick={() => setShowNewDM(true)}>Start DM</button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="chat-header">
-            <div className="chat-header-left">
-              <span className="chat-header-icon">
-                {activeChannel.type === "dm"
-                  ? <AvatarCircle username={activeChannel.name} size="sm" />
-                  : (activeChannel.isPrivate ? "LOCK" : "#")}
-              </span>
-              <div>
-                {activeChannel.type === "dm" && editingNick ? (
-                  <div className="nick-edit-row">
-                    <input className="nick-input" value={nickDraft}
-                      onChange={(e) => setNickDraft(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") saveNickname(); if (e.key === "Escape") setEditingNick(false); }}
-                      placeholder={activeChannel.name} autoFocus />
-                    <button className="nick-save-btn" onClick={saveNickname}>Save</button>
-                    <button className="nick-cancel-btn" onClick={() => setEditingNick(false)}>✕</button>
+            {/* ── Mobile Main Feed ── */}
+            <div className="mobile-main-feed">
+              {/* Top bar */}
+              <div className="mobile-topbar">
+                <div className="mobile-brand">
+                  <img src="/logo.png" alt="CocoDrop" className="mobile-brand-logo" />
+                  <span className="mobile-brand-name">CocoDrop</span>
+                </div>
+                <div className="mobile-topbar-right">
+                  <span className="mobile-online-count">{onlineCount} online</span>
+                  <div className="me-avatar-wrap" style={{ position: "relative" }}>
+                    <AvatarCircle username={user.username} size="sm" label={favoriteLetter} />
+                    <span className="me-status-dot" style={{ background: STATUS_OPTIONS.find(s => s.id === myStatus)?.color || "#22c55e" }} />
                   </div>
-                ) : (
-                  <p className="chat-header-name">
-                    {activeChannel.type === "dm"
-                      ? getDmDisplayName(activeChannel.id, activeChannel.name)
-                      : `#${activeChannel.name}`}
-                    {activeChannel.type === "dm" && (
-                      <button className="nick-edit-btn" title="Set nickname"
-                        onClick={() => { setNickDraft(dmNicknames[activeChannel.id] || ""); setEditingNick(true); }}>✎</button>
+                </div>
+              </div>
+
+              {/* ── Home Tab ── */}
+              {activeTab === "home" && (
+                <div className="mobile-feed">
+                  <div className="feed-section">
+                    <p className="feed-section-label">Direct Messages</p>
+                    {/* DM Circles Row */}
+                    <div className="dm-circles-row">
+                      {dms.map((dm) => {
+                        const other = dm.participants.find((p) => p !== user.username);
+                        return (
+                          <button key={dm._id} className="dm-circle-btn" onClick={() => openDM(dm)}>
+                            <div className="dm-circle-wrap">
+                              <AvatarCircle username={other} size="md" />
+                              <span className="dm-moon-badge">🌙</span>
+                              {unreadCounts[dm._id] > 0 && <span className="dm-unread-dot" />}
+                            </div>
+                            <span className="dm-circle-name">{other.slice(0, 8)}</span>
+                          </button>
+                        );
+                      })}
+                      <button className="dm-circle-btn" onClick={() => setShowNewDM(true)}>
+                        <div className="dm-circle-wrap add-circle">
+                          <span>+</span>
+                        </div>
+                        <span className="dm-circle-name">New DM</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div className="feed-section">
+                    <p className="feed-section-label">Recent Rooms</p>
+                    {rooms.length === 0 && <p className="feed-empty">No rooms yet. Create one!</p>}
+                    {rooms.map((room) => (
+                      <button
+                        key={room._id}
+                        className={`feed-room-item ${mutedRooms.has(room._id) ? "ch-muted" : ""}`}
+                        onClick={() => openRoom(room)}
+                        onContextMenu={(e) => openCtxMenu(e, room)}
+                      >
+                        <span className="feed-room-icon">
+                          {room.isPrivate ? "🔒" : "#"}
+                        </span>
+                        <div className="feed-room-info">
+                          <span className="feed-room-name">{room.name}</span>
+                          <span className="feed-room-sub">
+                            {room.isPrivate ? "Private" : "Public"} · {room.createdBy === user.username ? "Host" : (room.isMember ? "Member" : "Open")}
+                          </span>
+                        </div>
+                        {unreadCounts[room._id] > 0 && (
+                          <span className="unread-badge">{unreadCounts[room._id]}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Rooms Tab ── */}
+              {activeTab === "rooms" && (
+                <div className="mobile-feed">
+                  <div className="feed-section">
+                    <p className="feed-section-label">Private Rooms</p>
+                    {myPrivateRooms.length === 0 && <p className="feed-empty">No private rooms yet.</p>}
+                    {myPrivateRooms.map((room) => (
+                      <button key={room._id} className="feed-room-item" onClick={() => openRoom(room)} onContextMenu={(e) => openCtxMenu(e, room)}>
+                        <span className="feed-room-icon">🔒</span>
+                        <div className="feed-room-info">
+                          <span className="feed-room-name">{room.name}</span>
+                          <span className="feed-room-sub">Invite only · {room.createdBy === user.username ? "Host" : "Member"}</span>
+                        </div>
+                        {unreadCounts[room._id] > 0 && <span className="unread-badge">{unreadCounts[room._id]}</span>}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="feed-section">
+                    <p className="feed-section-label">Public Rooms</p>
+                    {publicRooms.length === 0 && <p className="feed-empty">No public rooms yet.</p>}
+                    {publicRooms.map((room) => (
+                      <button key={room._id} className="feed-room-item" onClick={() => openRoom(room)} onContextMenu={(e) => openCtxMenu(e, room)}>
+                        <span className="feed-room-icon">#</span>
+                        <div className="feed-room-info">
+                          <span className="feed-room-name">{room.name}</span>
+                          <span className="feed-room-sub">Open · {room.isMember ? "Joined" : "Tap to join"}</span>
+                        </div>
+                        {unreadCounts[room._id] > 0 && <span className="unread-badge">{unreadCounts[room._id]}</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ── Search Tab ── */}
+              {activeTab === "search" && (
+                <div className="mobile-feed">
+                  <div className="feed-section">
+                    <input
+                      className="mobile-search-input"
+                      placeholder="Search users and rooms…"
+                      value={searchQuery}
+                      onChange={(e) => handleMobileSearch(e.target.value)}
+                      autoFocus
+                    />
+                    {searchQuery && (
+                      <>
+                        {searchResults.users.length > 0 && (
+                          <>
+                            <p className="feed-section-label" style={{ marginTop: 16 }}>Users</p>
+                            {searchResults.users.map((item) => (
+                              <button key={item.username} className="feed-room-item" onClick={() => startDM(item.username)}>
+                                <AvatarCircle username={item.username} size="md" />
+                                <div className="feed-room-info">
+                                  <span className="feed-room-name">{item.username}</span>
+                                  <span className="feed-room-sub">{isOnline(item.username) ? "Online" : "Offline"}</span>
+                                </div>
+                                <span className="invite-add-btn">DM</span>
+                              </button>
+                            ))}
+                          </>
+                        )}
+                        {searchResults.rooms.length > 0 && (
+                          <>
+                            <p className="feed-section-label" style={{ marginTop: 16 }}>Rooms</p>
+                            {searchResults.rooms.map((room) => (
+                              <button key={room._id} className="feed-room-item" onClick={() => openRoom(room)}>
+                                <span className="feed-room-icon">{room.isPrivate ? "🔒" : "#"}</span>
+                                <div className="feed-room-info">
+                                  <span className="feed-room-name">{room.name}</span>
+                                  <span className="feed-room-sub">{room.isPrivate ? "Private" : "Public"}</span>
+                                </div>
+                              </button>
+                            ))}
+                          </>
+                        )}
+                        {searchResults.users.length === 0 && searchResults.rooms.length === 0 && (
+                          <p className="feed-empty">No results for "{searchQuery}"</p>
+                        )}
+                      </>
                     )}
-                  </p>
+                    {!searchQuery && <p className="feed-empty">Type to search users and rooms.</p>}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* ── Bottom Nav Capsule ── */}
+            <div className="bottom-nav-capsule">
+              <button
+                className={`nav-icon-btn ${activeTab === "home" ? "active" : ""}`}
+                onClick={() => setActiveTab("home")}
+                title="Home"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                  <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+              </button>
+              <button
+                className={`nav-icon-btn ${activeTab === "rooms" ? "active" : ""}`}
+                onClick={() => setActiveTab("rooms")}
+                title="Rooms"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/>
+                  <line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/>
+                </svg>
+              </button>
+              <div className="nav-center-wrap">
+                {showNavPopup && (
+                  <div className="nav-popup">
+                    <button onClick={() => { setShowNewRoom(true); setShowNavPopup(false); }}>
+                      🏠 New Room
+                    </button>
+                    <button onClick={() => { setShowNewDM(true); setShowNavPopup(false); }}>
+                      💬 New DM
+                    </button>
+                  </div>
                 )}
-                <p className="chat-header-sub">
-                  {activeChannel.type === "dm"
-                    ? (isPendingDM
-                      ? (isPendingDMRequester ? "DM request sent — waiting for acceptance" : "DM request — needs your approval")
-                      : `@${activeChannel.name} · ${isOnline(activeChannel.name) ? "Online" : "Offline"}`)
-                    : (activeChannel.isPrivate ? "Private invite-only room" : "Public room")}
-                </p>
-              </div>
-            </div>
-            <div className="chat-header-actions">
-              {activeChannel.type === "room" && (
-                <span className={`privacy-pill ${activeChannel.isPrivate ? "private" : "public"}`}>
-                  {activeChannel.isPrivate ? (
-                    <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Invite only</>
-                  ) : (
-                    <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="9" x2="20" y2="9"/><line x1="4" y1="15" x2="20" y2="15"/><line x1="10" y1="3" x2="8" y2="21"/><line x1="16" y1="3" x2="14" y2="21"/></svg>Open room</>
-                  )}
-                </span>
-              )}
-              {isPendingDM && (
-                <span className="privacy-pill private">
-                  {isPendingDMRequester ? "Awaiting approval" : "Pending request"}
-                </span>
-              )}
-              {isPendingDM && !isPendingDMRequester && (
-                <button className="header-action-btn" onClick={acceptDM}>Accept DM</button>
-              )}
-              {activeChannel.type === "room" && (
-                <button className="header-action-btn" onClick={openMembers}>Members</button>
-              )}
-              {activeChannel.type === "room" && isCreator && (
-                <button className="header-action-btn" onClick={() => { setRenameDraft(activeChannel.name); setShowRename(true); }}>Rename</button>
-              )}
-              {activeChannel.type === "room" && isCreator && activeChannel.isPrivate && (
-                <button className="header-action-btn" onClick={() => { setShowInvite(true); setInviteStatus(""); }}>Invite</button>
-              )}
-              {activeChannel.type === "room" && isCreator && (
-                <button className="header-action-btn danger-btn" onClick={() => deleteRoom()}>Delete</button>
-              )}
-            </div>
-          </div>
-          <div className="messages-area" ref={messagesAreaRef}>
-            {renderMessages()}
-            {typingUser && (
-              <div className="typing-row">
-                <AvatarCircle username={typingUser} size="sm" />
-                <div className="typing-bubble">
-                  <span className="typing-name">{typingUser} is typing</span>
-                  <span className="typing-dots"><span /><span /><span /></span>
-                </div>
-              </div>
-            )}
-            <div ref={bottomRef} />
-          </div>
-          <div className="input-bar">
-            {editingMsg ? (
-              <div className="edit-box">
-                <div className="edit-info">Editing Message</div>
-                <div className="edit-controls">
-                  <input className="edit-input" value={editDraft} onChange={(e) => setEditDraft(e.target.value)}
-                    onKeyDown={(e) => { if(e.key==="Enter") saveEdit(); if(e.key==="Escape") setEditingMsg(null); }} autoFocus />
-                  <button className="edit-btn save" onClick={saveEdit}>Save</button>
-                  <button className="edit-btn cancel" onClick={() => setEditingMsg(null)}>Cancel</button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <label className="upload-btn">
-                  <input type="file" onChange={handleImageUpload} accept="image/*" disabled={uploading || !canSendInActiveChannel} className="hidden-input" />
-                  {uploading ? <span className="loader-small" /> : (
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="attach-icon">
-                      <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/>
-                      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
-                    </svg>
-                  )}
-                </label>
-                <textarea
-                  className="msg-input"
-                  placeholder={canSendInActiveChannel ? "Type a message..." : (isPendingDM ? "Accept DM to start chatting" : "Join this room to chat")}
-                  value={text}
-                  onChange={handleTyping}
-                  onKeyDown={handleKeyDown}
-                  disabled={!canSendInActiveChannel}
-                />
-                <button className="send-btn" onClick={sendMessage} disabled={!text.trim() || !canSendInActiveChannel}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                <button
+                  className="nav-center-btn"
+                  onClick={() => setShowNavPopup((v) => !v)}
+                  title="New"
+                >
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                   </svg>
                 </button>
-              </>
-            )}
-            {channelError && <p className="composer-error">{channelError}</p>}
-            {uploadError && <p className="composer-error">{uploadError}</p>}
-          </div>
-        </>
-      )}
-    </main>
-  );
+              </div>
+              <button
+                className={`nav-icon-btn ${activeTab === "search" ? "active" : ""}`}
+                onClick={() => setActiveTab("search")}
+                title="Search"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+                </svg>
+              </button>
+              <button
+                className="nav-icon-btn"
+                onClick={() => setShowSettings(true)}
+                title="Settings"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3"/>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+              </button>
+            </div>
+          </>
+        )}
+      </div>
 
-  // ── Shared modals ──────────────────────────────────────────────
-  const Modals = () => (
-    <>
+      {/* ── Shared Modals ── */}
+
       {showNewRoom && (
         <div className="modal-overlay" onClick={() => setShowNewRoom(false)}>
           <div className="modal-box" onClick={(e) => e.stopPropagation()}>
@@ -1183,10 +1191,12 @@ export default function ChatPage({ user, onLogout }) {
               <input className="modal-input" placeholder="Room name" value={newRoomName} onChange={(e) => setNewRoomName(e.target.value)} autoFocus />
               <div className="room-type-toggle">
                 <button type="button" className={`room-type-btn ${!isPrivateRoom ? "active" : ""}`} onClick={() => setIsPrivateRoom(false)}>
-                  <span>Public Room</span><small>Anyone can join</small>
+                  <span>Public</span>
+                  <small>Anyone can join and read messages.</small>
                 </button>
                 <button type="button" className={`room-type-btn ${isPrivateRoom ? "active" : ""}`} onClick={() => setIsPrivateRoom(true)}>
-                  <span>Private Room</span><small>Invited people only</small>
+                  <span>Private 🔒</span>
+                  <small>Invite-only. Only members can read.</small>
                 </button>
               </div>
               <div className="modal-footer">
@@ -1457,40 +1467,6 @@ export default function ChatPage({ user, onLogout }) {
           <img src={viewingImage} className="lightbox-content" onClick={(e) => e.stopPropagation()} alt="View" />
         </div>
       )}
-    </>
-  );
-
-  // ── Main render ────────────────────────────────────────────────
-  return (
-    <>
-      {/* ── Desktop layout (> 680px) ── */}
-      <div className="app-layout desktop-layout">
-        {mobileSidebarOpen && (
-          <div className="mobile-sidebar-backdrop" onClick={() => setMobileSidebarOpen(false)} />
-        )}
-        <DesktopSidebar />
-        <DesktopChatMain />
-      </div>
-
-      {/* ── Mobile layout (≤ 680px) ── */}
-      <div className="cd-app mobile-layout">
-        {/* Close nav popup when tapping outside */}
-        {showNavPopup && (
-          <div className="nav-popup-backdrop" onClick={() => setShowNavPopup(false)} />
-        )}
-
-        {activeChannel ? (
-          <ChatView />
-        ) : (
-          <>
-            <MainFeed />
-            <BottomNav />
-          </>
-        )}
-      </div>
-
-      {/* Shared modals — always rendered on top */}
-      <Modals />
     </>
   );
 }
