@@ -78,6 +78,7 @@ export default function ChatPage({ user, onLogout }) {
   const [windowFocused, setWindowFocused] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [creatingRoom, setCreatingRoom] = useState(false);
+  const [showRoomInfo, setShowRoomInfo] = useState(false); // mobile room info bottom sheet
 
   // Mobile-specific state
   const [activeTab, setActiveTab] = useState("home"); // "home" | "rooms" | "search"
@@ -143,14 +144,36 @@ export default function ChatPage({ user, onLogout }) {
 
   useEffect(() => {
     const token = localStorage.getItem("sc_token");
-    const socket = io(SERVER_URL, { auth: { token } });
+    const socket = io(SERVER_URL, {
+      auth: { token },
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+    });
     socketRef.current = socket;
+
+    // Rejoin active channel after reconnect (handles Render wake-up)
+    socket.on("connect", () => {
+      console.log("Socket connected");
+      if (activeChannelRef.current?.id) {
+        socket.emit("join_channel", activeChannelRef.current.id);
+      }
+    });
 
     socket.on("online_users", setOnlineUsers);
     socket.on("receive_message", (msg) => {
       const isActive = msg.channelId === activeChannelRef.current?.id;
       if (isActive) {
-        setMessages((prev) => [...prev, msg]);
+        setMessages((prev) => {
+          // Remove matching temp message if it exists (same sender + content)
+          const withoutTemp = prev.filter(
+            (m) => !(m._pending && m.senderName === msg.senderName && m.content === msg.content)
+          );
+          // Prevent duplicate real messages
+          if (withoutTemp.some((m) => m._id === msg._id)) return withoutTemp;
+          return [...withoutTemp, msg];
+        });
         scrollToBottom();
       }
       if (msg.senderName !== user.username) {
@@ -262,8 +285,23 @@ export default function ChatPage({ user, onLogout }) {
   const sendMessage = () => {
     if (!text.trim() || !activeChannel || !canSendInActiveChannel) return;
     setChannelError("");
-    socketRef.current?.emit("send_message", { channelId: activeChannel.id, content: text.trim() });
-    setText("");
+    const content = text.trim();
+    setText(""); // clear input immediately
+
+    // Optimistically add message to UI so it never "vanishes"
+    const tempMsg = {
+      _id: `temp_${Date.now()}`,
+      channelId: activeChannel.id,
+      senderName: user.username,
+      type: "text",
+      content,
+      timestamp: new Date(),
+      _pending: true,
+    };
+    setMessages((prev) => [...prev, tempMsg]);
+    scrollToBottom();
+
+    socketRef.current?.emit("send_message", { channelId: activeChannel.id, content });
     socketRef.current?.emit("stop_typing", { channelId: activeChannel.id });
   };
 

@@ -1606,6 +1606,10 @@ button {
   margin-top: 2px;
 }
 
+.msg-pending {
+  opacity: 0.6;
+}
+
 .msg-edited {
   font-size: 0.65rem;
   color: var(--faint);

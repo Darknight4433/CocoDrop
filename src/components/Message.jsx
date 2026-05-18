@@ -18,7 +18,7 @@ export default function Message({ msg, isMe, serverUrl, onImageClick, onEdit, on
     <div className={`msg-row ${isMe ? "msg-me" : "msg-them"}`}>
       {!isMe && <AvatarCircle username={msg.senderName} size="sm" />}
       <div 
-        className={`msg-bubble ${isMe ? "msg-bubble-me" : "msg-bubble-them"} ${showMobileActions ? "show-mobile-actions" : ""}`}
+        className={`msg-bubble ${isMe ? "msg-bubble-me" : "msg-bubble-them"} ${showMobileActions ? "show-mobile-actions" : ""} ${msg._pending ? "msg-pending" : ""}`}
         onContextMenu={handleContextMenu}
       >
         {!isMe && <p className="msg-sender">{msg.senderName}</p>}
@@ -47,7 +47,7 @@ export default function Message({ msg, isMe, serverUrl, onImageClick, onEdit, on
         
         <div className="msg-meta">
           {msg.isEdited && <span className="msg-edited">(edited)</span>}
-          <p className="msg-time">{time}</p>
+          <p className="msg-time">{msg._pending ? "sending…" : time}</p>
         </div>
       </div>
       {isMe && <AvatarCircle username={msg.senderName} size="sm" />}
