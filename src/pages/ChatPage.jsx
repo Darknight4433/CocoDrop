@@ -908,28 +908,68 @@ export default function ChatPage({ user, onLogout }) {
                 </div>
               </div>
               <div className="chat-header-actions">
-                {activeChannel.type === "room" && (
-                  <span className={`privacy-pill ${activeChannel.isPrivate ? "private" : "public"}`}>
-                    {activeChannel.isPrivate ? "Invite only" : "Open room"}
-                  </span>
-                )}
                 {isPendingDM && !isPendingDMRequester && (
                   <button className="header-action-btn" onClick={acceptDM}>Accept DM</button>
                 )}
                 {activeChannel.type === "room" && (
-                  <button className="header-action-btn" onClick={openMembers}>Members</button>
-                )}
-                {activeChannel.type === "room" && isCreator && (
-                  <button className="header-action-btn" onClick={() => { setRenameDraft(activeChannel.name); setShowRename(true); }}>Rename</button>
-                )}
-                {activeChannel.type === "room" && isCreator && activeChannel.isPrivate && (
-                  <button className="header-action-btn" onClick={() => { setShowInvite(true); setInviteStatus(""); }}>Invite</button>
-                )}
-                {activeChannel.type === "room" && isCreator && (
-                  <button className="header-action-btn danger-btn" onClick={() => deleteRoom()}>Delete</button>
+                  <button className="chat-more-btn" onClick={() => setShowRoomInfo(true)}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
+                    </svg>
+                  </button>
                 )}
               </div>
             </div>
+
+            {/* ── Room info bottom sheet ── */}
+            {showRoomInfo && activeChannel?.type === "room" && (
+              <>
+                <div className="bottom-sheet-backdrop" onClick={() => setShowRoomInfo(false)} />
+                <div className="bottom-sheet">
+                  <div className="bottom-sheet-handle" />
+                  <div className="bottom-sheet-header">
+                    <span className="bottom-sheet-title">
+                      {activeChannel.isPrivate ? "🔒" : "#"} {activeChannel.name}
+                    </span>
+                    <span className="bottom-sheet-sub">{activeChannel.isPrivate ? "Private room" : "Public room"}</span>
+                  </div>
+                  <div className="bottom-sheet-actions">
+                    <button className="bottom-sheet-item" onClick={() => { setShowRoomInfo(false); openMembers(); }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                      Members
+                    </button>
+                    {isCreator && activeChannel.isPrivate && (
+                      <button className="bottom-sheet-item" onClick={() => { setShowRoomInfo(false); setShowInvite(true); setInviteStatus(""); }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+                        Invite People
+                      </button>
+                    )}
+                    {isCreator && (
+                      <button className="bottom-sheet-item" onClick={() => { setShowRoomInfo(false); setRenameDraft(activeChannel.name); setShowRename(true); }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                        Rename Room
+                      </button>
+                    )}
+                    <button className="bottom-sheet-item" onClick={() => { setShowRoomInfo(false); toggleMuteRoom(activeChannel.id); }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 5L6 9H2v6h4l5 4V5z"/>{mutedRooms.has(activeChannel.id) ? <><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></> : <path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>}</svg>
+                      {mutedRooms.has(activeChannel.id) ? "Unmute Room" : "Mute Room"}
+                    </button>
+                    {!isCreator && (
+                      <button className="bottom-sheet-item bottom-sheet-danger" onClick={() => { setShowRoomInfo(false); leaveRoom({ _id: activeChannel.id, name: activeChannel.name }); }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                        Leave Room
+                      </button>
+                    )}
+                    {isCreator && (
+                      <button className="bottom-sheet-item bottom-sheet-danger" onClick={() => { setShowRoomInfo(false); deleteRoom(); }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                        Delete Room
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="messages-area" ref={messagesAreaRef}>
               {renderMessages()}
