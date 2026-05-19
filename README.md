@@ -1,4 +1,4 @@
-# 🥥 CocoDrop
+# CocoDrop
 
 CocoDrop is a modern, real-time messaging and chat platform designed for both web and mobile devices. It offers instant messaging, private direct messages (DMs), group channels, real-time presence indicators, and push notifications.
 
