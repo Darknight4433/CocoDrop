@@ -83,7 +83,22 @@ export default function ChatPage({ user, onLogout }) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [showRoomInfo, setShowRoomInfo] = useState(false);
-  const [toasts, setToasts] = useState([]); // in-app notification toasts
+  const [toasts, setToasts] = useState([]);
+  // Settings sections
+  const [settingsTab, setSettingsTab] = useState("appearance"); // appearance | profile | notifications | chat | about
+  // Profile
+  const [bio, setBio] = useState(() => localStorage.getItem("cd_bio") || "");
+  const [bioEditing, setBioEditing] = useState(false);
+  const [bioDraft, setBioDraft] = useState("");
+  // Notification prefs
+  const [notifDMs, setNotifDMs] = useState(() => localStorage.getItem("cd_notif_dms") !== "false");
+  const [notifRooms, setNotifRooms] = useState(() => localStorage.getItem("cd_notif_rooms") !== "false");
+  const [notifSound, setNotifSound] = useState(() => localStorage.getItem("cd_notif_sound") !== "false");
+  const [notifInApp, setNotifInApp] = useState(() => localStorage.getItem("cd_notif_inapp") !== "false");
+  // Chat prefs
+  const [bubbleStyle, setBubbleStyle] = useState(() => localStorage.getItem("cd_bubble") || "modern");
+  const [compactMode, setCompactMode] = useState(() => localStorage.getItem("cd_compact") === "true");
+  const [enterToSend, setEnterToSend] = useState(() => localStorage.getItem("cd_enter_send") !== "false");
 
   // Mobile-specific state
   const [activeTab, setActiveTab] = useState("home"); // "home" | "rooms" | "search"
@@ -132,6 +147,13 @@ export default function ChatPage({ user, onLogout }) {
     localStorage.setItem("cd_status", myStatus);
     socketRef.current?.emit("set_status", myStatus);
   }, [myStatus]);
+  useEffect(() => { localStorage.setItem("cd_notif_dms", notifDMs); }, [notifDMs]);
+  useEffect(() => { localStorage.setItem("cd_notif_rooms", notifRooms); }, [notifRooms]);
+  useEffect(() => { localStorage.setItem("cd_notif_sound", notifSound); }, [notifSound]);
+  useEffect(() => { localStorage.setItem("cd_notif_inapp", notifInApp); }, [notifInApp]);
+  useEffect(() => { localStorage.setItem("cd_bubble", bubbleStyle); document.body.dataset.bubble = bubbleStyle; }, [bubbleStyle]);
+  useEffect(() => { localStorage.setItem("cd_compact", compactMode); document.body.dataset.compact = compactMode; }, [compactMode]);
+  useEffect(() => { localStorage.setItem("cd_enter_send", enterToSend); }, [enterToSend]);
 
   useEffect(() => {
     if ("Notification" in window && Notification.permission === "default") {
@@ -146,6 +168,14 @@ export default function ChatPage({ user, onLogout }) {
       window.removeEventListener("blur", handleBlur);
     };
   }, []);
+
+  // Request notification permission explicitly
+  const requestNotifPermission = async () => {
+    if (!("Notification" in window)) return "unsupported";
+    if (Notification.permission === "granted") return "granted";
+    const result = await Notification.requestPermission();
+    return result;
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("sc_token");
@@ -187,16 +217,22 @@ export default function ChatPage({ user, onLogout }) {
             ...prev,
             [msg.channelId]: (prev[msg.channelId] || 0) + 1,
           }));
-          // In-app toast (always show when message is in a different channel)
-          if (!isActive && myStatus !== "dnd") {
-            const chName = rooms.find(r => r._id === msg.channelId)?.name || msg.channelId;
+          const isDM = dms.some(d => d._id === msg.channelId);
+          const shouldNotif = isDM ? notifDMs : notifRooms;
+          // In-app toast
+          if (!isActive && notifInApp && shouldNotif && myStatus !== "dnd") {
+            const chName = rooms.find(r => r._id === msg.channelId)?.name ||
+              dms.find(d => d._id === msg.channelId)?.participants?.find(p => p !== user.username) || "DM";
             showToast(msg, chName);
           }
-          // OS notification (when app is backgrounded)
-          if (Notification.permission === "granted" && myStatus !== "dnd") {
-            const n = new Notification(`${msg.senderName}`, {
-              body: msg.content.startsWith("data:") ? "📷 Image" : msg.content,
+          // OS / phone notification drawer
+          if (Notification.permission === "granted" && shouldNotif && myStatus !== "dnd") {
+            const n = new Notification(msg.senderName, {
+              body: msg.content?.startsWith("data:") ? "📷 Sent an image" : msg.content,
               icon: "/favicon.png",
+              badge: "/favicon.png",
+              tag: msg.channelId, // group by channel
+              renotify: true,
             });
             n.onclick = () => { window.focus(); };
           }
@@ -317,7 +353,7 @@ export default function ChatPage({ user, onLogout }) {
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+    if (e.key === "Enter" && !e.shiftKey && enterToSend) { e.preventDefault(); sendMessage(); }
   };
 
   const handleImageUpload = async (e) => {
@@ -1348,65 +1384,241 @@ export default function ChatPage({ user, onLogout }) {
         <div className="modal-overlay" onClick={() => setShowSettings(false)}>
           <div className="modal-box settings-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <span className="modal-title">Your Settings</span>
-              <button className="modal-close" onClick={() => setShowSettings(false)}>Close</button>
+              <span className="modal-title">Settings</span>
+              <button className="modal-close" onClick={() => setShowSettings(false)}>✕</button>
             </div>
-            <div className="settings-preview">
-              <AvatarCircle username={user.username} size="lg" label={favoriteLetter} />
-              <div>
-                <strong>{favoriteEmoji} {user.username}</strong>
-                <span>{currentTheme.name} theme · {currentFont.name} font</span>
-              </div>
+
+            {/* Settings tabs */}
+            <div className="settings-tabs">
+              {[
+                { id: "appearance", label: "🎨 Look" },
+                { id: "profile",    label: "👤 Profile" },
+                { id: "notifications", label: "🔔 Notifs" },
+                { id: "chat",       label: "💬 Chat" },
+                { id: "about",      label: "ℹ️ About" },
+              ].map(t => (
+                <button key={t.id} className={`settings-tab-btn ${settingsTab === t.id ? "active" : ""}`} onClick={() => setSettingsTab(t.id)}>
+                  {t.label}
+                </button>
+              ))}
             </div>
-            <section className="settings-section">
-              <div className="settings-section-head"><span>Theme</span><small>Choose your CocoDrop look</small></div>
-              <div className="settings-grid theme-settings-grid">
-                {THEMES.map((item) => (
-                  <button key={item.id} type="button" className={`theme-choice ${theme === item.id ? "active" : ""}`} onClick={() => setTheme(item.id)}>
-                    <span className={`theme-swatch theme-${item.id}`} />
-                    <strong>{item.name}</strong>
-                  </button>
-                ))}
-              </div>
-            </section>
-            <section className="settings-section">
-              <div className="settings-section-head"><span>Font Style</span><small>Pick your reading feel</small></div>
-              <div className="segmented-row">
-                {FONT_STYLES.map((item) => (
-                  <button key={item.id} type="button" className={`segment-btn font-${item.id} ${fontStyle === item.id ? "active" : ""}`} onClick={() => setFontStyle(item.id)}>
-                    {item.name}
-                  </button>
-                ))}
-              </div>
-            </section>
-            <section className="settings-section">
-              <div className="settings-section-head"><span>Favorite Letter</span><small>Shown in your avatar on this device</small></div>
-              <input className="modal-input" value={favoriteLetter} maxLength={2} onChange={(e) => setFavoriteLetter(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} placeholder="C" />
-            </section>
-            <section className="settings-section">
-              <div className="settings-section-head"><span>Favorite Emoji</span><small>Your tiny signature</small></div>
-              <div className="emoji-grid">
-                {EMOJI_CHOICES.map((emoji) => (
-                  <button key={emoji} type="button" className={`emoji-choice ${favoriteEmoji === emoji ? "active" : ""}`} onClick={() => setFavoriteEmoji(emoji)}>
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            </section>
-            <section className="settings-section">
-              <div className="settings-section-head"><span>Status</span><small>Your current presence</small></div>
-              <div className="status-pills" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                {STATUS_OPTIONS.map(s => (
-                  <button key={s.id} className={`status-pill ${myStatus === s.id ? "active" : ""}`}
-                    style={myStatus === s.id ? { borderColor: s.color, color: s.color } : {}}
-                    onClick={() => changeMyStatus(s.id)}>{s.label}</button>
-                ))}
-              </div>
-            </section>
-            <section className="settings-section">
-              <div className="settings-section-head"><span>Account</span></div>
-              <button className="btn-secondary" style={{ width: "100%" }} onClick={onLogout}>Sign Out</button>
-            </section>
+
+            {/* ── Appearance ── */}
+            {settingsTab === "appearance" && (
+              <>
+                <div className="settings-preview">
+                  <AvatarCircle username={user.username} size="lg" label={favoriteLetter} />
+                  <div>
+                    <strong>{favoriteEmoji} {user.username}</strong>
+                    <span>{currentTheme.name} · {currentFont.name}</span>
+                  </div>
+                </div>
+                <section className="settings-section">
+                  <div className="settings-section-head"><span>Theme</span></div>
+                  <div className="settings-grid theme-settings-grid">
+                    {THEMES.map((item) => (
+                      <button key={item.id} type="button" className={`theme-choice ${theme === item.id ? "active" : ""}`} onClick={() => setTheme(item.id)}>
+                        <span className={`theme-swatch theme-${item.id}`} />
+                        <strong>{item.name}</strong>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+                <section className="settings-section">
+                  <div className="settings-section-head"><span>Font</span></div>
+                  <div className="segmented-row">
+                    {FONT_STYLES.map((item) => (
+                      <button key={item.id} type="button" className={`segment-btn font-${item.id} ${fontStyle === item.id ? "active" : ""}`} onClick={() => setFontStyle(item.id)}>
+                        {item.name}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+                <section className="settings-section">
+                  <div className="settings-section-head"><span>Avatar Letter</span><small>Your initials</small></div>
+                  <input className="modal-input" value={favoriteLetter} maxLength={2} onChange={(e) => setFavoriteLetter(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} placeholder="C" />
+                </section>
+                <section className="settings-section">
+                  <div className="settings-section-head"><span>Emoji</span><small>Your signature</small></div>
+                  <div className="emoji-grid">
+                    {EMOJI_CHOICES.map((emoji) => (
+                      <button key={emoji} type="button" className={`emoji-choice ${favoriteEmoji === emoji ? "active" : ""}`} onClick={() => setFavoriteEmoji(emoji)}>
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              </>
+            )}
+
+            {/* ── Profile ── */}
+            {settingsTab === "profile" && (
+              <>
+                <div className="settings-preview">
+                  <AvatarCircle username={user.username} size="lg" label={favoriteLetter} />
+                  <div>
+                    <strong>{favoriteEmoji} {user.username}</strong>
+                    <span style={{ color: "var(--muted)", fontSize: "0.78rem" }}>@{user.username}</span>
+                  </div>
+                </div>
+                <section className="settings-section">
+                  <div className="settings-section-head"><span>Username</span><small>Can't be changed</small></div>
+                  <div className="settings-info-row">
+                    <span className="settings-info-val">@{user.username}</span>
+                    <span className="settings-info-badge">Locked</span>
+                  </div>
+                </section>
+                <section className="settings-section">
+                  <div className="settings-section-head"><span>Bio</span><small>Tell people about yourself</small></div>
+                  {bioEditing ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      <textarea
+                        className="modal-input"
+                        style={{ minHeight: 80, resize: "none" }}
+                        value={bioDraft}
+                        onChange={(e) => setBioDraft(e.target.value)}
+                        maxLength={120}
+                        placeholder="Write something about yourself…"
+                        autoFocus
+                      />
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button className="btn-primary" style={{ flex: 1 }} onClick={() => { setBio(bioDraft); localStorage.setItem("cd_bio", bioDraft); setBioEditing(false); }}>Save</button>
+                        <button className="btn-secondary" onClick={() => setBioEditing(false)}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="settings-info-row" onClick={() => { setBioDraft(bio); setBioEditing(true); }} style={{ cursor: "pointer" }}>
+                      <span className="settings-info-val" style={{ color: bio ? "var(--text)" : "var(--faint)" }}>
+                        {bio || "Tap to add a bio…"}
+                      </span>
+                      <span className="settings-info-badge">Edit</span>
+                    </div>
+                  )}
+                </section>
+                <section className="settings-section">
+                  <div className="settings-section-head"><span>Status</span></div>
+                  <div className="status-pills" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    {STATUS_OPTIONS.map(s => (
+                      <button key={s.id} className={`status-pill ${myStatus === s.id ? "active" : ""}`}
+                        style={myStatus === s.id ? { borderColor: s.color, color: s.color } : {}}
+                        onClick={() => changeMyStatus(s.id)}>{s.label}</button>
+                    ))}
+                  </div>
+                </section>
+                <section className="settings-section">
+                  <div className="settings-section-head"><span>Account</span></div>
+                  <button className="btn-secondary" style={{ width: "100%", color: "var(--danger)", borderColor: "var(--danger)" }} onClick={onLogout}>Sign Out</button>
+                </section>
+              </>
+            )}
+
+            {/* ── Notifications ── */}
+            {settingsTab === "notifications" && (
+              <>
+                <section className="settings-section" style={{ marginTop: 0, borderTop: "none", paddingTop: 8 }}>
+                  <div className="settings-section-head"><span>Phone Notifications</span></div>
+                  <div className="settings-info-row" style={{ marginBottom: 8 }}>
+                    <span style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
+                      {Notification.permission === "granted" ? "✅ Allowed" : Notification.permission === "denied" ? "❌ Blocked in phone settings" : "⚠️ Not enabled yet"}
+                    </span>
+                    {Notification.permission !== "granted" && Notification.permission !== "denied" && (
+                      <button className="btn-primary" style={{ padding: "6px 14px", fontSize: "0.8rem" }} onClick={requestNotifPermission}>Enable</button>
+                    )}
+                  </div>
+                </section>
+                <section className="settings-section">
+                  <div className="settings-section-head"><span>Alert me for</span></div>
+                  <div className="settings-toggle-list">
+                    <label className="settings-toggle-row">
+                      <span>Direct Messages</span>
+                      <input type="checkbox" className="settings-toggle" checked={notifDMs} onChange={e => setNotifDMs(e.target.checked)} />
+                    </label>
+                    <label className="settings-toggle-row">
+                      <span>Room Messages</span>
+                      <input type="checkbox" className="settings-toggle" checked={notifRooms} onChange={e => setNotifRooms(e.target.checked)} />
+                    </label>
+                    <label className="settings-toggle-row">
+                      <span>In-app banners</span>
+                      <input type="checkbox" className="settings-toggle" checked={notifInApp} onChange={e => setNotifInApp(e.target.checked)} />
+                    </label>
+                  </div>
+                </section>
+                <section className="settings-section">
+                  <div className="settings-section-head"><span>Do Not Disturb</span><small>Overrides all alerts</small></div>
+                  <label className="settings-toggle-row">
+                    <span>Enable DND</span>
+                    <input type="checkbox" className="settings-toggle" checked={myStatus === "dnd"} onChange={e => changeMyStatus(e.target.checked ? "dnd" : "online")} />
+                  </label>
+                </section>
+              </>
+            )}
+
+            {/* ── Chat ── */}
+            {settingsTab === "chat" && (
+              <>
+                <section className="settings-section" style={{ marginTop: 0, borderTop: "none", paddingTop: 8 }}>
+                  <div className="settings-section-head"><span>Message Bubbles</span></div>
+                  <div className="segmented-row">
+                    {[{ id: "modern", label: "Modern" }, { id: "classic", label: "Classic" }, { id: "minimal", label: "Minimal" }].map(b => (
+                      <button key={b.id} className={`segment-btn ${bubbleStyle === b.id ? "active" : ""}`} onClick={() => setBubbleStyle(b.id)}>{b.label}</button>
+                    ))}
+                  </div>
+                </section>
+                <section className="settings-section">
+                  <div className="settings-section-head"><span>Input</span></div>
+                  <div className="settings-toggle-list">
+                    <label className="settings-toggle-row">
+                      <div>
+                        <span>Enter to send</span>
+                        <small style={{ display: "block", color: "var(--faint)", fontSize: "0.72rem" }}>On mobile, use send button instead</small>
+                      </div>
+                      <input type="checkbox" className="settings-toggle" checked={enterToSend} onChange={e => setEnterToSend(e.target.checked)} />
+                    </label>
+                    <label className="settings-toggle-row">
+                      <span>Compact mode</span>
+                      <input type="checkbox" className="settings-toggle" checked={compactMode} onChange={e => setCompactMode(e.target.checked)} />
+                    </label>
+                  </div>
+                </section>
+              </>
+            )}
+
+            {/* ── About ── */}
+            {settingsTab === "about" && (
+              <>
+                <div className="about-logo-wrap">
+                  <img src="/favicon.png" alt="CocoDrop" className="about-logo" />
+                  <span className="about-app-name">CocoDrop</span>
+                  <span className="about-version">Version 1.0.0</span>
+                </div>
+                <section className="settings-section">
+                  <div className="settings-section-head"><span>App Info</span></div>
+                  <div className="settings-info-list">
+                    <div className="settings-info-row"><span>Platform</span><span className="settings-info-val">Capacitor + React</span></div>
+                    <div className="settings-info-row"><span>Backend</span><span className="settings-info-val">Node.js + Socket.io</span></div>
+                    <div className="settings-info-row"><span>Hosting</span><span className="settings-info-val">Render.com</span></div>
+                    <div className="settings-info-row"><span>Build</span><span className="settings-info-val">Vite 8</span></div>
+                  </div>
+                </section>
+                <section className="settings-section">
+                  <div className="settings-section-head"><span>Features</span></div>
+                  <div className="settings-info-list">
+                    <div className="settings-info-row"><span>Public rooms</span><span className="settings-info-val">✅</span></div>
+                    <div className="settings-info-row"><span>Private rooms</span><span className="settings-info-val">✅</span></div>
+                    <div className="settings-info-row"><span>Direct messages</span><span className="settings-info-val">✅</span></div>
+                    <div className="settings-info-row"><span>Image sharing</span><span className="settings-info-val">✅</span></div>
+                    <div className="settings-info-row"><span>Notifications</span><span className="settings-info-val">✅</span></div>
+                    <div className="settings-info-row"><span>8 themes</span><span className="settings-info-val">✅</span></div>
+                  </div>
+                </section>
+                <section className="settings-section">
+                  <p style={{ fontSize: "0.78rem", color: "var(--faint)", textAlign: "center", lineHeight: 1.6 }}>
+                    Made with 🥥 by Vaishnavi<br/>Drop in. Chat freely.
+                  </p>
+                </section>
+              </>
+            )}
+
           </div>
         </div>
       )}

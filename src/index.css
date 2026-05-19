@@ -2801,3 +2801,180 @@ body[data-theme="daylight"] .nav-center-btn {
 .theme-sakura   { background: linear-gradient(135deg, #f472b6, #c084fc); }
 .theme-forest   { background: linear-gradient(135deg, #4ade80, #facc15); }
 .theme-midnight { background: linear-gradient(135deg, #a855f7, #ec4899); }
+
+/* ── Settings tabs ── */
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 0 0 12px;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+}
+.settings-tabs::-webkit-scrollbar { display: none; }
+
+.settings-tab-btn {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.settings-tab-btn.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.settings-tab-btn:hover:not(.active) {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+/* ── Settings toggle rows ── */
+.settings-toggle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.settings-toggle-row:last-child { border-bottom: none; }
+
+.settings-toggle {
+  width: 44px;
+  height: 24px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--panel-3);
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s;
+  border: 1px solid var(--border);
+}
+.settings-toggle:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.settings-toggle::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  transition: transform 0.2s;
+}
+.settings-toggle:checked::after {
+  transform: translateX(20px);
+}
+
+/* ── Settings info rows ── */
+.settings-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.settings-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+.settings-info-row:last-child { border-bottom: none; }
+
+.settings-info-val {
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.settings-info-badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+/* ── About section ── */
+.about-logo-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 20px 0 8px;
+}
+
+.about-logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px var(--accent-soft);
+}
+
+.about-app-name {
+  font-size: 1.2rem;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.about-version {
+  font-size: 0.75rem;
+  color: var(--faint);
+}
+
+/* ── Compact mode ── */
+body[data-compact="true"] .msg-bubble {
+  padding: 6px 10px;
+}
+body[data-compact="true"] .msg-row {
+  gap: 4px;
+}
+body[data-compact="true"] .messages-area {
+  gap: 2px;
+}
+
+/* ── Bubble styles ── */
+body[data-bubble="classic"] .msg-bubble-me {
+  border-radius: 18px 18px 4px 18px;
+}
+body[data-bubble="classic"] .msg-bubble-them {
+  border-radius: 18px 18px 18px 4px;
+}
+body[data-bubble="minimal"] .msg-bubble {
+  background: transparent !important;
+  border: none !important;
+  padding: 4px 0;
+}
+body[data-bubble="minimal"] .msg-bubble-me .msg-text {
+  color: var(--accent);
+}
