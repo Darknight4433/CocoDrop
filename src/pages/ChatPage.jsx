@@ -1595,7 +1595,7 @@ export default function ChatPage({ user, onLogout }) {
                 <div className="about-logo-wrap">
                   <img src="/favicon.png" alt="CocoDrop" className="about-logo" />
                   <span className="about-app-name">CocoDrop</span>
-                  <span className="about-version">Version 1.0.0</span>
+                  <span className="about-version">CocoDrop v1.0.10</span>
                 </div>
                 <section className="settings-section">
                   <div className="settings-section-head"><span>App Info</span></div>
