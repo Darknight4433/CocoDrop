@@ -20,10 +20,10 @@ const FONT_STYLES = [
   { id: "rounded", name: "Rounded" },
   { id: "mono", name: "Mono" },
 ];
-const EMOJI_CHOICES = ["🥥", "⚡", "🌙", "✨", "🔥", "💎", "🛸", "🫧"];
+const EMOJI_CHOICES = ["⚡", "🌙", "✨", "🔥", "💎", "🛸", "🫧"];
 const getSavedEmoji = () => {
   const saved = localStorage.getItem("cd_emoji");
-  return EMOJI_CHOICES.includes(saved) ? saved : "🥥";
+  return EMOJI_CHOICES.includes(saved) ? saved : "⚡";
 };
 const getSavedLetter = (username) => {
   const saved = localStorage.getItem("cd_letter") || username[0] || "C";
@@ -696,7 +696,7 @@ export default function ChatPage({ user, onLogout }) {
               </button>
             </div>
             <div className="me-pill">
-              <div className="me-avatar-wrap">
+              <div className="me-avatar-wrap" onClick={() => setShowSettings(true)} style={{ cursor: "pointer" }}>
                 <AvatarCircle username={user.username} size="sm" label={favoriteLetter} />
                 <span className="me-status-dot" style={{ background: STATUS_OPTIONS.find(s => s.id === myStatus)?.color || "#22c55e" }} />
               </div>
@@ -1125,7 +1125,7 @@ export default function ChatPage({ user, onLogout }) {
                 </div>
                 <div className="mobile-topbar-right">
                   <span className="mobile-online-count">{onlineCount} online</span>
-                  <div className="me-avatar-wrap" style={{ position: "relative" }}>
+                  <div className="me-avatar-wrap" style={{ position: "relative", cursor: "pointer" }} onClick={() => setShowSettings(true)}>
                     <AvatarCircle username={user.username} size="sm" label={favoriteLetter} />
                     <span className="me-status-dot" style={{ background: STATUS_OPTIONS.find(s => s.id === myStatus)?.color || "#22c55e" }} />
                   </div>
@@ -1519,10 +1519,16 @@ export default function ChatPage({ user, onLogout }) {
                   <div className="settings-section-head"><span>Phone Notifications</span></div>
                   <div className="settings-info-row" style={{ marginBottom: 8 }}>
                     <span style={{ fontSize: "0.85rem", color: "var(--muted)" }}>
-                      {Notification.permission === "granted" ? "✅ Allowed" : Notification.permission === "denied" ? "❌ Blocked in phone settings" : "⚠️ Not enabled yet"}
+                      {typeof window !== "undefined" && typeof window.Notification === "undefined"
+                        ? "⚠️ Not supported on this device"
+                        : typeof window !== "undefined" && window.Notification?.permission === "granted"
+                          ? "✅ Notifications allowed"
+                          : typeof window !== "undefined" && window.Notification?.permission === "denied"
+                            ? "❌ Blocked — enable in phone Settings → Apps → CocoDrop"
+                            : "⚠️ Not enabled yet"}
                     </span>
-                    {Notification.permission !== "granted" && Notification.permission !== "denied" && (
-                      <button className="btn-primary" style={{ padding: "6px 14px", fontSize: "0.8rem" }} onClick={requestNotifPermission}>Enable</button>
+                    {typeof window !== "undefined" && typeof window.Notification !== "undefined" && window.Notification?.permission !== "granted" && window.Notification?.permission !== "denied" && (
+                      <button className="btn-primary" style={{ padding: "6px 14px", fontSize: "0.8rem", flexShrink: 0 }} onClick={requestNotifPermission}>Enable</button>
                     )}
                   </div>
                 </section>
@@ -1613,7 +1619,7 @@ export default function ChatPage({ user, onLogout }) {
                 </section>
                 <section className="settings-section">
                   <p style={{ fontSize: "0.78rem", color: "var(--faint)", textAlign: "center", lineHeight: 1.6 }}>
-                    Made with 🥥 by Vaishnavi<br/>Drop in. Chat freely.
+                    Made with ❤️ by Vaishnavi<br/>Drop in. Chat freely.
                   </p>
                 </section>
               </>

@@ -1,16 +1,69 @@
-# React + Vite
+# 🥥 CocoDrop
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+CocoDrop is a modern, real-time messaging and chat platform designed for both web and mobile devices. It offers instant messaging, private direct messages (DMs), group channels, real-time presence indicators, and push notifications.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 📱 Download the Android App (APK)
 
-## React Compiler
+You can download the latest version of the CocoDrop Android app directly from our GitHub Releases page:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+👉 **[Download CocoDrop APK](https://github.com/Darknight4433/CocoDrop/releases)** 👈
 
-## Expanding the ESLint configuration
+### How to Install on Android:
+1. Tap the link above, navigate to the latest release, and download the `.apk` file (e.g., `CocoDrop.ver.1.0.9.apk`).
+2. Open the downloaded file on your Android device.
+3. If prompted, enable **"Install from Unknown Sources"** in your browser or file manager settings.
+4. Follow the on-screen instructions to complete the installation and launch CocoDrop!
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+---
+
+## ✨ Features
+
+- **Real-Time Chat:** Powered by Socket.io for instant message delivery.
+- **Channels & Direct Messages:** Create group channels or chat privately with other users.
+- **Online Presence:** See who is online and active in real-time.
+- **Push Notifications:** Integrated with Firebase Cloud Messaging (FCM) to keep you updated.
+- **Responsive Design:** Mobile-first layout optimized for a seamless experience on both phones and desktops.
+
+---
+
+## 🛠️ Tech Stack
+
+- **Frontend:** React, Vite, Capacitor (for Android mobile app wrapper)
+- **Backend:** Node.js, Express, Socket.io, Firebase Admin SDK
+- **Database:** Local JSON-based persistent storage (lightweight & self-hosted)
+
+---
+
+## 🚀 Running the Project Locally
+
+### 1. Run the Backend Server
+```bash
+cd server
+npm install
+npm run dev
+```
+
+### 2. Run the Frontend App
+```bash
+# In the root directory
+npm install
+npm run dev
+```
+
+---
+
+## 🏗️ Building for Mobile (Capacitor)
+
+To compile and update the Android project:
+```bash
+# 1. Build frontend assets
+npm run build
+
+# 2. Sync with Android project
+npx cap sync
+
+# 3. Open in Android Studio
+npx cap open android
+```
