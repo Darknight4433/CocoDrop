@@ -1,6 +1,7 @@
 const express = require("express");
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 const jwt = require("jsonwebtoken");
 const { messages } = require("../db");
 const { canSendToChannel } = require("../channelAccess");
@@ -19,11 +20,15 @@ const auth = (req, res, next) => {
   }
 };
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, path.join(__dirname, "../uploads")),
-  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+// Use memory storage — convert to base64 so images survive Render redeploys
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 4 * 1024 * 1024 }, // 4MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) cb(null, true);
+    else cb(new Error("Only images allowed"));
+  },
 });
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 router.post("/upload/:channelId", auth, upload.single("image"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
@@ -32,12 +37,15 @@ router.post("/upload/:channelId", auth, upload.single("image"), (req, res) => {
     if (accessErr) return res.status(500).json({ error: "Upload failed" });
     if (!allowed) return res.status(403).json({ error: "Not allowed in this channel" });
 
+    // Store as base64 data URL — survives server restarts and redeploys
+    const base64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+
     const msg = {
       channelId: req.params.channelId,
       senderId: req.user.id,
       senderName: req.user.username,
       type: "image",
-      content: `/uploads/${req.file.filename}`,
+      content: base64,
       timestamp: new Date(),
     };
 

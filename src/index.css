@@ -78,6 +78,82 @@ body[data-theme="ember"] {
   --accent-soft: rgba(255, 138, 76, 0.14);
 }
 
+/* ── Ocean theme ── */
+body[data-theme="ocean"] {
+  --bg: #020d1a;
+  --bg-soft: #041525;
+  --panel: rgba(4, 21, 37, 0.94);
+  --panel-solid: #051c30;
+  --panel-2: #072540;
+  --panel-3: #0a3055;
+  --border: rgba(56, 189, 248, 0.15);
+  --border-strong: rgba(56, 189, 248, 0.28);
+  --text: #e0f2fe;
+  --muted: #7ec8e3;
+  --faint: #4a90a4;
+  --accent: #38bdf8;
+  --accent-2: #818cf8;
+  --accent-3: #e0f2fe;
+  --accent-soft: rgba(56, 189, 248, 0.14);
+}
+
+/* ── Sakura theme ── */
+body[data-theme="sakura"] {
+  --bg: #0f0810;
+  --bg-soft: #180d1a;
+  --panel: rgba(28, 14, 30, 0.94);
+  --panel-solid: #1c0e1e;
+  --panel-2: #2a1230;
+  --panel-3: #381840;
+  --border: rgba(244, 114, 182, 0.15);
+  --border-strong: rgba(244, 114, 182, 0.28);
+  --text: #fce7f3;
+  --muted: #e879a0;
+  --faint: #9d4e6e;
+  --accent: #f472b6;
+  --accent-2: #c084fc;
+  --accent-3: #fce7f3;
+  --accent-soft: rgba(244, 114, 182, 0.14);
+}
+
+/* ── Forest theme ── */
+body[data-theme="forest"] {
+  --bg: #050e08;
+  --bg-soft: #091510;
+  --panel: rgba(9, 21, 16, 0.94);
+  --panel-solid: #0b1a12;
+  --panel-2: #112518;
+  --panel-3: #183320;
+  --border: rgba(74, 222, 128, 0.15);
+  --border-strong: rgba(74, 222, 128, 0.28);
+  --text: #dcfce7;
+  --muted: #6ee7a0;
+  --faint: #3d8a5a;
+  --accent: #4ade80;
+  --accent-2: #facc15;
+  --accent-3: #dcfce7;
+  --accent-soft: rgba(74, 222, 128, 0.14);
+}
+
+/* ── Midnight theme ── */
+body[data-theme="midnight"] {
+  --bg: #000000;
+  --bg-soft: #080808;
+  --panel: rgba(10, 10, 10, 0.96);
+  --panel-solid: #0a0a0a;
+  --panel-2: #141414;
+  --panel-3: #1e1e1e;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+  --text: #ffffff;
+  --muted: #888888;
+  --faint: #555555;
+  --accent: #a855f7;
+  --accent-2: #ec4899;
+  --accent-3: #f3e8ff;
+  --accent-soft: rgba(168, 85, 247, 0.14);
+}
+
 html,
 body,
 #root {
@@ -1914,6 +1990,7 @@ body[data-theme="ember"] .btn-primary {
   position: fixed;
   z-index: 1000;
   min-width: 180px;
+  max-width: calc(100vw - 32px); /* never overflow screen */
   background: var(--panel-solid);
   border: 1px solid var(--border-strong);
   border-radius: 8px;
@@ -2156,15 +2233,12 @@ body[data-theme="ember"] .btn-primary {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
+  gap: 0;
   background: color-mix(in srgb, var(--panel-2) 60%, transparent);
   border: 1px solid var(--border);
   border-radius: 12px;
   margin-bottom: 8px;
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
+  overflow: hidden;
   transition: background 0.15s, border-color 0.15s;
 }
 
@@ -2172,6 +2246,42 @@ body[data-theme="ember"] .btn-primary {
 .feed-room-item:active {
   background: var(--panel-2);
   border-color: var(--accent);
+}
+
+.feed-room-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.feed-room-dots {
+  width: 40px;
+  height: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s;
+}
+
+.feed-room-dots:hover,
+.feed-room-dots:active {
+  background: var(--panel-3);
+  color: var(--text);
 }
 
 .feed-room-icon {
@@ -2620,3 +2730,74 @@ body[data-theme="daylight"] .nav-center-btn {
 .bottom-sheet-danger:active {
   background: color-mix(in srgb, var(--danger) 10%, transparent) !important;
 }
+
+/* ── In-app notification toast ── */
+.notif-toast-wrap {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  width: min(360px, calc(100vw - 32px));
+}
+
+.notif-toast {
+  background: var(--panel-solid);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  pointer-events: all;
+  cursor: pointer;
+  animation: toastIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes toastIn {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.notif-toast-avatar {
+  flex-shrink: 0;
+}
+
+.notif-toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.notif-toast-sender {
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--accent);
+  display: block;
+}
+
+.notif-toast-msg {
+  font-size: 0.82rem;
+  color: var(--muted);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notif-toast-room {
+  font-size: 0.7rem;
+  color: var(--faint);
+  display: block;
+  margin-top: 1px;
+}
+
+/* New theme swatches */
+.theme-ocean    { background: linear-gradient(135deg, #38bdf8, #818cf8); }
+.theme-sakura   { background: linear-gradient(135deg, #f472b6, #c084fc); }
+.theme-forest   { background: linear-gradient(135deg, #4ade80, #facc15); }
+.theme-midnight { background: linear-gradient(135deg, #a855f7, #ec4899); }

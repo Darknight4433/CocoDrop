@@ -5,7 +5,10 @@ import { SERVER_URL } from "../api";
 
 export default function Message({ msg, isMe, serverUrl, onImageClick, onEdit, onDelete }) {
   const [showMobileActions, setShowMobileActions] = useState(false);
-  const imageUrl = msg.type === "image" ? `${serverUrl || SERVER_URL}${msg.content}` : null;
+  // content is either a base64 data URL (new) or a /uploads/ path (old)
+  const imageUrl = msg.type === "image"
+    ? (msg.content.startsWith("data:") ? msg.content : `${serverUrl || SERVER_URL}${msg.content}`)
+    : null;
   const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   const handleContextMenu = (e) => {

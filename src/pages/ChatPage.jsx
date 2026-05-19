@@ -6,10 +6,14 @@ import { AvatarCircle } from "../utils/avatar";
 
 import { SERVER_URL } from "../api";
 const THEMES = [
-  { id: "aurora", name: "Aurora" },
+  { id: "aurora",   name: "Aurora"   },
   { id: "graphite", name: "Graphite" },
   { id: "daylight", name: "Daylight" },
-  { id: "ember", name: "Ember" },
+  { id: "ember",    name: "Ember"    },
+  { id: "ocean",    name: "Ocean"    },
+  { id: "sakura",   name: "Sakura"   },
+  { id: "forest",   name: "Forest"   },
+  { id: "midnight", name: "Midnight" },
 ];
 const FONT_STYLES = [
   { id: "inter", name: "Clean" },
@@ -78,7 +82,8 @@ export default function ChatPage({ user, onLogout }) {
   const [windowFocused, setWindowFocused] = useState(true);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [creatingRoom, setCreatingRoom] = useState(false);
-  const [showRoomInfo, setShowRoomInfo] = useState(false); // mobile room info bottom sheet
+  const [showRoomInfo, setShowRoomInfo] = useState(false);
+  const [toasts, setToasts] = useState([]); // in-app notification toasts
 
   // Mobile-specific state
   const [activeTab, setActiveTab] = useState("home"); // "home" | "rooms" | "search"
@@ -182,10 +187,16 @@ export default function ChatPage({ user, onLogout }) {
             ...prev,
             [msg.channelId]: (prev[msg.channelId] || 0) + 1,
           }));
+          // In-app toast (always show when message is in a different channel)
+          if (!isActive && myStatus !== "dnd") {
+            const chName = rooms.find(r => r._id === msg.channelId)?.name || msg.channelId;
+            showToast(msg, chName);
+          }
+          // OS notification (when app is backgrounded)
           if (Notification.permission === "granted" && myStatus !== "dnd") {
-            const n = new Notification(`New message from ${msg.senderName}`, {
-              body: msg.content,
-              icon: "/logo.png",
+            const n = new Notification(`${msg.senderName}`, {
+              body: msg.content.startsWith("data:") ? "📷 Image" : msg.content,
+              icon: "/favicon.png",
             });
             n.onclick = () => { window.focus(); };
           }
@@ -438,7 +449,13 @@ export default function ChatPage({ user, onLogout }) {
     });
   };
 
-  const openCtxMenu = (e, room) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, room }); };
+  const openCtxMenu = (e, room) => {
+    e.preventDefault();
+    // Keep menu on screen — if too far right, anchor to right edge instead
+    const x = Math.min(e.clientX, window.innerWidth - 200);
+    const y = Math.min(e.clientY, window.innerHeight - 160);
+    setCtxMenu({ x, y, room });
+  };
   const closeCtxMenu = () => setCtxMenu(null);
 
   const renameRoom = async (e) => {
@@ -520,6 +537,13 @@ export default function ChatPage({ user, onLogout }) {
 
   const isOnline = (username) => onlineUsers.some((u) => u.username === username);
 
+  // Show in-app toast notification
+  const showToast = (msg, channelName) => {
+    const id = Date.now();
+    setToasts((prev) => [...prev.slice(-2), { id, msg, channelName }]); // max 3
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
+  };
+
   const handleMobileSearch = async (q) => {
     setSearchQuery(q);
     if (!q.trim()) { setSearchResults({ users: [], rooms: [] }); return; }
@@ -590,6 +614,32 @@ export default function ChatPage({ user, onLogout }) {
 
   return (
     <>
+      {/* ── In-app notification toasts ── */}
+      {toasts.length > 0 && (
+        <div className="notif-toast-wrap">
+          {toasts.map((t) => (
+            <div key={t.id} className="notif-toast" onClick={() => {
+              setToasts((prev) => prev.filter((x) => x.id !== t.id));
+              const room = rooms.find(r => r._id === t.msg.channelId);
+              const dm = dms.find(d => d._id === t.msg.channelId);
+              if (room) openRoom(room);
+              else if (dm) openDM(dm);
+            }}>
+              <div className="notif-toast-avatar">
+                <AvatarCircle username={t.msg.senderName} size="sm" />
+              </div>
+              <div className="notif-toast-body">
+                <span className="notif-toast-sender">{t.msg.senderName}</span>
+                <span className="notif-toast-msg">
+                  {t.msg.content?.startsWith("data:") ? "📷 Image" : t.msg.content}
+                </span>
+                <span className="notif-toast-room">#{t.channelName}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ── Desktop layout (> 680px) ── */}
       <div className="app-layout desktop-layout">
         {mobileSidebarOpen && (
@@ -1078,25 +1128,21 @@ export default function ChatPage({ user, onLogout }) {
                     <p className="feed-section-label">Recent Rooms</p>
                     {rooms.length === 0 && <p className="feed-empty">No rooms yet. Create one!</p>}
                     {rooms.map((room) => (
-                      <button
-                        key={room._id}
-                        className={`feed-room-item ${mutedRooms.has(room._id) ? "ch-muted" : ""}`}
-                        onClick={() => openRoom(room)}
-                        onContextMenu={(e) => openCtxMenu(e, room)}
-                      >
-                        <span className="feed-room-icon">
-                          {room.isPrivate ? "🔒" : "#"}
-                        </span>
-                        <div className="feed-room-info">
-                          <span className="feed-room-name">{room.name}</span>
-                          <span className="feed-room-sub">
-                            {room.isPrivate ? "Private" : "Public"} · {room.createdBy === user.username ? "Host" : (room.isMember ? "Member" : "Open")}
-                          </span>
-                        </div>
-                        {unreadCounts[room._id] > 0 && (
-                          <span className="unread-badge">{unreadCounts[room._id]}</span>
-                        )}
-                      </button>
+                      <div key={room._id} className={`feed-room-item ${mutedRooms.has(room._id) ? "ch-muted" : ""}`}>
+                        <button className="feed-room-main" onClick={() => openRoom(room)}>
+                          <span className="feed-room-icon">{room.isPrivate ? "🔒" : "#"}</span>
+                          <div className="feed-room-info">
+                            <span className="feed-room-name">{room.name}</span>
+                            <span className="feed-room-sub">
+                              {room.isPrivate ? "Private" : "Public"} · {room.createdBy === user.username ? "Host" : (room.isMember ? "Member" : "Open")}
+                            </span>
+                          </div>
+                          {unreadCounts[room._id] > 0 && <span className="unread-badge">{unreadCounts[room._id]}</span>}
+                        </button>
+                        <button className="feed-room-dots" onClick={(e) => { e.stopPropagation(); openCtxMenu(e, room); }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -1109,28 +1155,38 @@ export default function ChatPage({ user, onLogout }) {
                     <p className="feed-section-label">Private Rooms</p>
                     {myPrivateRooms.length === 0 && <p className="feed-empty">No private rooms yet.</p>}
                     {myPrivateRooms.map((room) => (
-                      <button key={room._id} className="feed-room-item" onClick={() => openRoom(room)} onContextMenu={(e) => openCtxMenu(e, room)}>
-                        <span className="feed-room-icon">🔒</span>
-                        <div className="feed-room-info">
-                          <span className="feed-room-name">{room.name}</span>
-                          <span className="feed-room-sub">Invite only · {room.createdBy === user.username ? "Host" : "Member"}</span>
-                        </div>
-                        {unreadCounts[room._id] > 0 && <span className="unread-badge">{unreadCounts[room._id]}</span>}
-                      </button>
+                      <div key={room._id} className="feed-room-item">
+                        <button className="feed-room-main" onClick={() => openRoom(room)}>
+                          <span className="feed-room-icon">🔒</span>
+                          <div className="feed-room-info">
+                            <span className="feed-room-name">{room.name}</span>
+                            <span className="feed-room-sub">Invite only · {room.createdBy === user.username ? "Host" : "Member"}</span>
+                          </div>
+                          {unreadCounts[room._id] > 0 && <span className="unread-badge">{unreadCounts[room._id]}</span>}
+                        </button>
+                        <button className="feed-room-dots" onClick={(e) => { e.stopPropagation(); openCtxMenu(e, room); }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                        </button>
+                      </div>
                     ))}
                   </div>
                   <div className="feed-section">
                     <p className="feed-section-label">Public Rooms</p>
                     {publicRooms.length === 0 && <p className="feed-empty">No public rooms yet.</p>}
                     {publicRooms.map((room) => (
-                      <button key={room._id} className="feed-room-item" onClick={() => openRoom(room)} onContextMenu={(e) => openCtxMenu(e, room)}>
-                        <span className="feed-room-icon">#</span>
-                        <div className="feed-room-info">
-                          <span className="feed-room-name">{room.name}</span>
-                          <span className="feed-room-sub">Open · {room.isMember ? "Joined" : "Tap to join"}</span>
-                        </div>
-                        {unreadCounts[room._id] > 0 && <span className="unread-badge">{unreadCounts[room._id]}</span>}
-                      </button>
+                      <div key={room._id} className="feed-room-item">
+                        <button className="feed-room-main" onClick={() => openRoom(room)}>
+                          <span className="feed-room-icon">#</span>
+                          <div className="feed-room-info">
+                            <span className="feed-room-name">{room.name}</span>
+                            <span className="feed-room-sub">Open · {room.isMember ? "Joined" : "Tap to join"}</span>
+                          </div>
+                          {unreadCounts[room._id] > 0 && <span className="unread-badge">{unreadCounts[room._id]}</span>}
+                        </button>
+                        <button className="feed-room-dots" onClick={(e) => { e.stopPropagation(); openCtxMenu(e, room); }}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
